@@ -1143,7 +1143,7 @@ a[href^="mailto"] {
     -webkit-box-sizing: content-box;
 }
 
-/* 
+/*
     User Style:
     Change the following styles to modify the appearance of Colorbox.  They are
     ordered & tabbed in a way that represents the nesting of the generated HTML.
@@ -1234,10 +1234,10 @@ a[href^="mailto"] {
 /*#cboxLoadingOverlay{background:url(images/loading_background.png) no-repeat center center;}
         #cboxLoadingGraphic{background:url(images/loading.gif) no-repeat center center;}
 
-        /* these elements are buttons, and may need to have additional styles reset to avoid unwanted base styles 
+        /* these elements are buttons, and may need to have additional styles reset to avoid unwanted base styles
         #cboxPrevious, #cboxNext, #cboxSlideshow, #cboxClose {border:0; padding:0; margin:0; overflow:visible; width:auto; background:none; }
-        
-        /* avoid outlines on :active (mouseclick), but preserve outlines on :focus (tabbed navigating) 
+
+        /* avoid outlines on :active (mouseclick), but preserve outlines on :focus (tabbed navigating)
         #cboxPrevious:active, #cboxNext:active, #cboxSlideshow:active, #cboxClose:active {outline:0;}
 
         #cboxSlideshow{position:absolute; bottom:4px; right:30px; color:#0092ef;}
@@ -1263,6 +1263,8 @@ a[href^="mailto"] {
     position: absolute;
     top: 4px;
     left: 3%;
+    color: white;
+      mix-blend-mode: difference;
 }
 
 #cboxPrevious,
