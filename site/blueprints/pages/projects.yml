@@ -1,0 +1,16 @@
+title: Projects
+
+columns:
+  - width: 1/3
+    sections:
+      drafts:
+        extends: sections/projects
+        headline: Drafts
+        status: draft
+
+  - width: 1/3
+    sections:
+      listed:
+        extends: sections/projects
+        headline: Published
+        status: listed

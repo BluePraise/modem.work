@@ -1,0 +1,60 @@
+Title: Eureka
+
+----
+
+Order: 6
+
+----
+
+Year: 2018
+
+----
+
+Location: San Francisco, CA
+
+----
+
+Author: 
+
+----
+
+Tags: Design, Fabrication
+
+----
+
+Headline: Eureka: 2,492 Items (lost, found, wanted)
+
+----
+
+Excerptedtext: This map explores  the risks and rewards of living in the Bay Area.  Modem used custom software tools and a modified IBM Wheelwriter typewriter to imprint aggregated text onto 263 letter-sized pages, juxtaposing quotidien interactions with the density of geological hazards present in the physical landscape.
+
+----
+
+Text: 
+
+This map explores  the risks and rewards of living in the Bay Area.  Modem used custom software tools and a modified IBM Wheelwriter typewriter to imprint aggregated text onto 263 letter-sized pages, juxtaposing quotidien interactions with the density of geological hazards present in the physical landscape.  Eureka was a site-specific installation for the Yerba Buena Center for the Arts' Bay Area Now 8 triennial.
+
+Composite typewriter drawing on paper 
+90 x 264 inches
+
+With Jaclyn Berry, Jeremy Ferguson, <a target="_blank" rel="noopener noreferrer" href="http://ecosimulation.com/chrisgregg/">Chris Gregg</a>, and Carlos Sandoval
+
+----
+
+Startmonth: Dec
+
+----
+
+Endmonth: Jan
+
+----
+
+Image: 
+
+----
+
+Startdate: 2018-12-11
+
+----
+
+Enddate: 2019-01-31

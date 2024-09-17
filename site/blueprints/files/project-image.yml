@@ -1,0 +1,21 @@
+title: Project Image
+
+accept:
+  mime: image/*
+  minheight: 400
+
+sections:
+  content:
+    type: fields
+    fields:
+      title:
+        label: Title
+        type: text
+  meta:
+    type: fields
+    fields:
+      inHero:
+        label: Show in hero?
+        type: toggle
+        text: use that project image in the hero
+        default: false

@@ -1,0 +1,41 @@
+Title: Servizio Modificato
+
+----
+
+Order: 2
+
+----
+
+Year: 2021
+
+----
+
+Location: Venice, IT
+
+----
+
+Author: 
+
+- k@modem.work
+
+----
+
+Tags: Exhibit, Urban Design
+
+----
+
+Headline: Modified Service
+
+----
+
+Excerptedtext: Historically, Venice was not confined to the dense network of *isole *shaped from sandbars in the early Middle Ages and cleaved by the Grand Canal.  Rather, it was an interlinked archipelago stretching the length and breadth of the lagoon, in which a variety of innovative, incompatible, or inconvenient functions were diffused.  Today, communities in the lagoon and its margins—tourists, residents, and commuters, alike—move separately along highly prescribed routes, yet rarely across the surface of the water that connects them.
+
+----
+
+Text: 
+
+Historically, Venice was not confined to the dense network of *isole *shaped from sandbars in the early Middle Ages and cleaved by the Grand Canal.  Rather, it was an interlinked archipelago stretching the length and breadth of the lagoon, in which a variety of innovative, incompatible, or inconvenient functions were diffused.  Today, communities in the lagoon and its margins—tourists, residents, and commuters, alike—move separately along highly prescribed routes, yet rarely across the surface of the water that connects them.  
+
+This installation for the (link: https://www.labiennale.org/en text: 2021 Venice Biennale), is a collaborative project that provides the framework—and a catalyst—for new journeys and trajectories.  Over the course of the exhibition, the project will expand to encompass the research of students, critics, ecologists, and architects, culminating in a symposium at the Biennale's conclusion.  
+
+Servizio Modificato is a collaboration with Sandro Bisá of Bisá Associati (IT), with catalogtree (NL) and William Sherman of the University of Virginia Venice Program (USA/IT).

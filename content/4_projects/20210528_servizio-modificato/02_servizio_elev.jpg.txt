@@ -1,0 +1,5 @@
+Inhero: false
+
+----
+
+Template: project-image

@@ -1,0 +1,12 @@
+title: Images
+
+sections:
+  drafts:
+    extends: sections/projectimages
+    headline: Drafts
+    status: draft
+
+  listed:
+    extends: sections/projectimages
+    headline: Published images
+    status: listed

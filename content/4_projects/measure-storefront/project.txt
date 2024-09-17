@@ -1,0 +1,33 @@
+Title: Measure Storefront
+
+----
+
+Order: 10
+
+----
+
+Year: 2015
+
+----
+
+Location: New York City, NY
+
+----
+
+Author: 
+
+----
+
+Tags: Urban Design, Fabrication
+
+----
+
+Headline: Measure / Storefront
+
+----
+
+Excerptedtext: As an invited contribution to the 2015 exhibition Measure, modem’s Nicholas de Monchaux produced a series of alternative facades for the Storefront for (link: # text: Art and Architecture).
+
+----
+
+Text: As an invited contribution to the 2015 exhibition Measure, modem’s Nicholas de Monchaux produced a series of alternative facades for the Storefront for (link: # text: Art and Architecture).
