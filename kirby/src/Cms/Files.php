@@ -2,6 +2,9 @@
 
 namespace Kirby\Cms;
 
+use Kirby\Exception\InvalidArgumentException;
+use Kirby\Filesystem\F;
+
 /**
  * The `$files` object extends the general
  * `Collection` class and refers to a
@@ -12,12 +15,12 @@ namespace Kirby\Cms;
  *
  * @package   Kirby Cms
  * @author    Bastian Allgeier <bastian@getkirby.com>
- * @link      http://getkirby.com
+ * @link      https://getkirby.com
  * @copyright Bastian Allgeier
+ * @license   https://getkirby.com/license
  */
 class Files extends Collection
 {
-
     /**
      * All registered files methods
      *
@@ -30,13 +33,14 @@ class Files extends Collection
      * an entire second collection to the
      * current collection
      *
-     * @param mixed $item
-     * @return Files
+     * @param \Kirby\Cms\Files|\Kirby\Cms\File|string $object
+     * @return $this
+     * @throws \Kirby\Exception\InvalidArgumentException When no `File` or `Files` object or an ID of an existing file is passed
      */
     public function add($object)
     {
-        // add a page collection
-        if (is_a($object, static::class) === true) {
+        // add a files collection
+        if (is_a($object, self::class) === true) {
             $this->data = array_merge($this->data, $object->data);
 
         // add a file by id
@@ -44,8 +48,13 @@ class Files extends Collection
             $this->__set($file->id(), $file);
 
         // add a file object
-        } elseif (is_a($object, File::class) === true) {
+        } elseif (is_a($object, 'Kirby\Cms\File') === true) {
             $this->__set($object->id(), $object);
+
+        // give a useful error message on invalid input;
+        // silently ignore "empty" values for compatibility with existing setups
+        } elseif (in_array($object, [null, false, true], true) !== true) {
+            throw new InvalidArgumentException('You must pass a Files or File object or an ID of an existing file to the Files collection');
         }
 
         return $this;
@@ -55,9 +64,9 @@ class Files extends Collection
      * Sort all given files by the
      * order in the array
      *
-     * @param array $files List of filenames
+     * @param array $files List of file ids
      * @param int $offset Sorting offset
-     * @return self
+     * @return $this
      */
     public function changeSort(array $files, int $offset = 0)
     {
@@ -75,9 +84,8 @@ class Files extends Collection
      * Creates a files collection from an array of props
      *
      * @param array $files
-     * @param Model $parent
-     * @param array $inject
-     * @return Files
+     * @param \Kirby\Cms\Model $parent
+     * @return static
      */
     public static function factory(array $files, Model $parent)
     {
@@ -89,7 +97,7 @@ class Files extends Collection
             $props['kirby']      = $kirby;
             $props['parent']     = $parent;
 
-            $file = new File($props);
+            $file = File::factory($props);
 
             $collection->data[$file->id()] = $file;
         }
@@ -99,40 +107,91 @@ class Files extends Collection
 
     /**
      * Tries to find a file by id/filename
+     * @deprecated 3.7.0 Use `$files->find()` instead
+     * @todo 3.8.0 Remove method
+     * @codeCoverageIgnore
      *
      * @param string $id
-     * @return File|null
+     * @return \Kirby\Cms\File|null
      */
-    public function findById($id)
+    public function findById(string $id)
     {
-        return $this->get(ltrim($this->parent->id() . '/' . $id, '/'));
+        Helpers::deprecated('Cms\Files::findById() has been deprecated and will be removed in Kirby 3.8.0. Use $files->find() instead.');
+
+        return $this->findByKey($id);
     }
 
     /**
-     * Alias for FilesFinder::findById() which is
-     * used internally in the Files collection to
-     * map the get method correctly.
+     * Finds a file by its filename
+     * @internal Use `$files->find()` instead
      *
      * @param string $key
-     * @return File|null
+     * @return \Kirby\Cms\File|null
      */
-    public function findByKey($key)
+    public function findByKey(string $key)
     {
-        return $this->findById($key);
+        return $this->get(ltrim($this->parent->id() . '/' . $key, '/'));
+    }
+
+    /**
+     * Returns the file size for all
+     * files in the collection in a
+     * human-readable format
+     * @since 3.6.0
+     *
+     * @param string|null|false $locale Locale for number formatting,
+     *                                  `null` for the current locale,
+     *                                  `false` to disable number formatting
+     * @return string
+     */
+    public function niceSize($locale = null): string
+    {
+        return F::niceSize($this->size(), $locale);
+    }
+
+    /**
+     * Returns the raw size for all
+     * files in the collection
+     * @since 3.6.0
+     *
+     * @return int
+     */
+    public function size(): int
+    {
+        return F::size($this->values(fn ($file) => $file->root()));
+    }
+
+    /**
+     * Returns the collection sorted by
+     * the sort number and the filename
+     *
+     * @return static
+     */
+    public function sorted()
+    {
+        return $this->sort('sort', 'asc', 'filename', 'asc');
     }
 
     /**
      * Filter all files by the given template
      *
      * @param null|string|array $template
-     * @return self
+     * @return $this|static
      */
-    public function template($template): self
+    public function template($template)
     {
         if (empty($template) === true) {
             return $this;
         }
 
-        return $this->filterBy('template', is_array($template) ? 'in' : '==', $template);
+        if ($template === 'default') {
+            $template = ['default', ''];
+        }
+
+        return $this->filter(
+            'template',
+            is_array($template) ? 'in' : '==',
+            $template
+        );
     }
 }

@@ -3,19 +3,20 @@
 namespace Kirby\Cms;
 
 /**
- * The StructureObject reprents each item
+ * The StructureObject represents each item
  * in a Structure collection. StructureObjects
  * behave pretty much the same as Pages or Users
  * and have a Content object to access their fields.
- * All fields in a StructureObject are therefor also
+ * All fields in a StructureObject are therefore also
  * wrapped in a Field object and can be accessed in
  * the same way as Page fields. They also use the same
  * Field methods.
  *
  * @package   Kirby Cms
  * @author    Bastian Allgeier <bastian@getkirby.com>
- * @link      http://getkirby.com
+ * @link      https://getkirby.com
  * @copyright Bastian Allgeier
+ * @license   https://getkirby.com/license
  */
 class StructureObject extends Model
 {
@@ -34,7 +35,7 @@ class StructureObject extends Model
     protected $id;
 
     /**
-     * @var Page|Site|File|User
+     * @var \Kirby\Cms\Site|\Kirby\Cms\Page|\Kirby\Cms\File|\Kirby\Cms\User|null
      */
     protected $parent;
 
@@ -60,7 +61,7 @@ class StructureObject extends Model
             return $this->$method;
         }
 
-        return $this->content()->get($method, $arguments);
+        return $this->content()->get($method);
     }
 
     /**
@@ -76,9 +77,9 @@ class StructureObject extends Model
     /**
      * Returns the content
      *
-     * @return Content
+     * @return \Kirby\Cms\Content
      */
-    public function content(): Content
+    public function content()
     {
         if (is_a($this->content, 'Kirby\Cms\Content') === true) {
             return $this->content;
@@ -102,9 +103,24 @@ class StructureObject extends Model
     }
 
     /**
+     * Compares the current object with the given structure object
+     *
+     * @param mixed $structure
+     * @return bool
+     */
+    public function is($structure): bool
+    {
+        if (is_a($structure, 'Kirby\Cms\StructureObject') === false) {
+            return false;
+        }
+
+        return $this === $structure;
+    }
+
+    /**
      * Returns the parent Model object
      *
-     * @return Page|Site|File|User
+     * @return \Kirby\Cms\Model
      */
     public function parent()
     {
@@ -115,9 +131,9 @@ class StructureObject extends Model
      * Sets the Content object with the given parent
      *
      * @param array|null $content
-     * @return self
+     * @return $this
      */
-    protected function setContent(array $content = null): self
+    protected function setContent(array $content = null)
     {
         $this->content = $content;
         return $this;
@@ -130,22 +146,21 @@ class StructureObject extends Model
      * specified.
      *
      * @param string $id
-     * @return self
+     * @return $this
      */
-    protected function setId(string $id): self
+    protected function setId(string $id)
     {
         $this->id = $id;
         return $this;
     }
 
     /**
-     * Sets the parent Model. This can either be a
-     * Page, Site, File or User object
+     * Sets the parent Model
      *
-     * @param Page|Site|File|User|null $parent
-     * @return self
+     * @return $this
+     * @param \Kirby\Cms\Site|\Kirby\Cms\Page|\Kirby\Cms\File|\Kirby\Cms\User|null $parent
      */
-    protected function setParent(Model $parent = null): self
+    protected function setParent(Model $parent = null)
     {
         $this->parent = $parent;
         return $this;
@@ -154,10 +169,10 @@ class StructureObject extends Model
     /**
      * Sets the parent Structure collection
      *
-     * @param Structure $structure
-     * @return self
+     * @param \Kirby\Cms\Structure|null $structure
+     * @return $this
      */
-    protected function setStructure(Structure $structure = null): self
+    protected function setStructure(Structure $structure = null)
     {
         $this->structure = $structure;
         return $this;
@@ -166,7 +181,7 @@ class StructureObject extends Model
     /**
      * Returns the parent Structure collection as siblings
      *
-     * @return Structure
+     * @return \Kirby\Cms\Structure
      */
     protected function siblingsCollection()
     {

@@ -1,0 +1,13 @@
+Title: Archaeology in Reverse
+
+----
+
+Inhero: false
+
+----
+
+Template: project-image
+
+----
+
+Sort: 1

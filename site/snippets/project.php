@@ -2,9 +2,9 @@
 
 $tag = urldecode(param('tag'));
 if ($tag) {
-    $projects = page('projects')->children()->visible()->filterBy('tags', $tag, ',')->sortBy('order')->flip();
+    $projects = page('projects')->children()->published()->filterBy('tags', $tag, ',')->sortBy('order')->flip();
 } else {
-    $projects = page('projects')->children()->visible()->sortBy('order', SORT_NUMERIC);
+    $projects = page('projects')->children()->published()->sortBy('order', SORT_NUMERIC);
 }
 
 ?>
@@ -35,12 +35,12 @@ if ($tag) {
 
         <?php if ($image = $project->images()->sortBy('sort', 'asc')->first()): ?>
           <a href="<?=$project->url()?>">
-            <img class="showcase-image showcase-image--big" src="<?=$image->url()?>" alt="<?=$image->title()?>">
+            <img class="showcase-image showcase-image--big" loading="lazy" src="<?=$image->url()?>" alt="<?=$image->title()?>">
         </a>
         <?php endif; ?>
       </div>
         <div class="showcase-text">
-          <?= $project->excerptedText()->kirbytextinline($project->url()); ?>
+          <?= $project->excerptedText()->kt()->inline($project->url()); ?>
           <a class="more"href="<?= $project->url() ?>">...more</a>
         </div>
 

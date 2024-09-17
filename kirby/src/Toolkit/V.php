@@ -3,22 +3,22 @@
 namespace Kirby\Toolkit;
 
 use Exception;
-use Kirby\Image\Image;
-use Kirby\Toolkit\Str;
+use Kirby\Exception\InvalidArgumentException;
+use Kirby\Http\Idn;
 use ReflectionFunction;
+use Throwable;
 
 /**
-* A set of validator methods
-*
-* @package   Kirby Toolkit
-* @author    Bastian Allgeier <bastian@getkirby.com>
-* @link      http://getkirby.com
-* @copyright Bastian Allgeier
-* @license   MIT
-*/
+ * A set of validator methods
+ *
+ * @package   Kirby Toolkit
+ * @author    Bastian Allgeier <bastian@getkirby.com>
+ * @link      https://getkirby.com
+ * @copyright Bastian Allgeier
+ * @license   https://opensource.org/licenses/MIT
+ */
 class V
 {
-
     /**
      * An array with all installed validators
      *
@@ -44,6 +44,75 @@ class V
     }
 
     /**
+     * Runs a number of validators on a set of data and
+     * checks if the data is invalid
+     * @since 3.7.0
+     *
+     * @param array $data
+     * @param array $rules
+     * @param array $messages
+     * @return array
+     */
+    public static function invalid(array $data = [], array $rules = [], array $messages = []): array
+    {
+        $errors = [];
+
+        foreach ($rules as $field => $validations) {
+            $validationIndex = -1;
+
+            // See: http://php.net/manual/en/types.comparisons.php
+            // only false for: null, undefined variable, '', []
+            $value   = $data[$field] ?? null;
+            $filled  = $value !== null && $value !== '' && $value !== [];
+            $message = $messages[$field] ?? $field;
+
+            // True if there is an error message for each validation method.
+            $messageArray = is_array($message);
+
+            foreach ($validations as $method => $options) {
+                // If the index is numeric, there is no option
+                // and `$value` is sent directly as a `$options` parameter
+                if (is_numeric($method) === true) {
+                    $method  = $options;
+                    $options = [$value];
+                } else {
+                    if (is_array($options) === false) {
+                        $options = [$options];
+                    }
+
+                    array_unshift($options, $value);
+                }
+
+                $validationIndex++;
+
+                if ($method === 'required') {
+                    if ($filled) {
+                        // Field is required and filled.
+                        continue;
+                    }
+                } elseif ($filled) {
+                    if (V::$method(...$options) === true) {
+                        // Field is filled and passes validation method.
+                        continue;
+                    }
+                } else {
+                    // If a field is not required and not filled, no validation should be done.
+                    continue;
+                }
+
+                // If no continue was called we have a failed validation.
+                if ($messageArray) {
+                    $errors[$field][] = $message[$validationIndex] ?? $field;
+                } else {
+                    $errors[$field] = $message;
+                }
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
      * Creates a useful error message for the given validator
      * and the arguments. This is used mainly internally
      * to create error messages
@@ -66,17 +135,20 @@ class V
         $reflection = new ReflectionFunction($validator);
         $arguments  = [];
 
-
         foreach ($reflection->getParameters() as $index => $parameter) {
             $value = $params[$index] ?? null;
 
             if (is_array($value) === true) {
-                foreach ($value as $index => $item) {
-                    if (is_array($item) === true) {
-                        $value[$index] = implode('|', $item);
+                try {
+                    foreach ($value as $key => $item) {
+                        if (is_array($item) === true) {
+                            $value[$key] = implode('|', $item);
+                        }
                     }
+                    $value = implode(', ', $value);
+                } catch (Throwable $e) {
+                    $value = '-';
                 }
-                $value = implode(', ', $value);
             }
 
             $arguments[$parameter->getName()] = $value;
@@ -100,11 +172,11 @@ class V
      * a set of rules, using all registered
      * validators
      *
-     * @param  mixed    $value
-     * @param  array    $rules
-     * @param  array    $messages
-     * @param  boolean  $fail
-     * @return boolean|array
+     * @param mixed $value
+     * @param array $rules
+     * @param array $messages
+     * @param bool $fail
+     * @return bool|array
      */
     public static function value($value, array $rules, array $messages = [], bool $fail = true)
     {
@@ -140,9 +212,9 @@ class V
      * a set of rules, using all registered
      * validators
      *
-     * @param  array    $input
-     * @param  array    $rules
-     * @return boolean
+     * @param array $input
+     * @param array $rules
+     * @return bool
      */
     public static function input(array $input, array $rules): bool
     {
@@ -150,7 +222,10 @@ class V
             $fieldValue = $input[$fieldName] ?? null;
 
             // first check for required fields
-            if (($fieldRules['required'] ?? false) === true && $fieldValue === null) {
+            if (
+                ($fieldRules['required'] ?? false) === true &&
+                $fieldValue === null
+            ) {
                 throw new Exception(sprintf('The "%s" field is missing', $fieldName));
             }
 
@@ -163,12 +238,10 @@ class V
             }
 
             try {
-                V::value($fieldValue, $fieldRules);
+                static::value($fieldValue, $fieldRules);
             } catch (Exception $e) {
                 throw new Exception(sprintf($e->getMessage() . ' for field "%s"', $fieldName));
             }
-
-            static::value($fieldValue, $fieldRules);
         }
 
         return true;
@@ -177,9 +250,9 @@ class V
     /**
      * Calls an installed validator and passes all arguments
      *
-     * @param  string   $method
-     * @param  array    $arguments
-     * @return boolean
+     * @param string $method
+     * @param array $arguments
+     * @return bool
      */
     public static function __callStatic(string $method, array $arguments): bool
     {
@@ -210,15 +283,15 @@ V::$validators = [
     /**
      * Valid: `a-z | A-Z`
      */
-    'alpha' => function ($value): bool {
-        return V::match($value, '/^([a-z])+$/i') === true;
+    'alpha' => function ($value, bool $unicode = false): bool {
+        return V::match($value, ($unicode === true ? '/^([\pL])+$/u' : '/^([a-z])+$/i')) === true;
     },
 
     /**
      * Valid: `a-z | A-Z | 0-9`
      */
-    'alphanum' => function ($value): bool {
-        return V::match($value, '/^[a-z0-9]+$/i') === true;
+    'alphanum' => function ($value, bool $unicode = false): bool {
+        return V::match($value, ($unicode === true ? '/^[\pL\pN]+$/u' : '/^([a-z0-9])+$/i')) === true;
     },
 
     /**
@@ -237,13 +310,50 @@ V::$validators = [
     },
 
     /**
-     * Checks for a valid date
+     * Checks for a valid date or compares two
+     * dates with each other.
+     *
+     * Pass only the first argument to check for a valid date.
+     * Pass an operator as second argument and another date as
+     * third argument to compare them.
      */
-    'date' => function ($value): bool {
-        $date = date_parse($value);
-        return ($date !== false &&
-                $date['error_count'] === 0 &&
-                $date['warning_count'] === 0);
+    'date' => function (?string $value, string $operator = null, string $test = null): bool {
+        // make sure $value is a string
+        $value ??= '';
+
+        $args = func_get_args();
+
+        // simple date validation
+        if (count($args) === 1) {
+            $date = date_parse($value);
+            return $date !== false &&
+                    $date['error_count'] === 0 &&
+                    $date['warning_count'] === 0;
+        }
+
+        $value = strtotime($value);
+        $test  = strtotime($test);
+
+        if (is_int($value) !== true || is_int($test) !== true) {
+            return false;
+        }
+
+        switch ($operator) {
+            case '!=':
+                return $value !== $test;
+            case '<':
+                return $value < $test;
+            case '>':
+                return $value > $test;
+            case '<=':
+                return $value <= $test;
+            case '>=':
+                return $value >= $test;
+            case '==':
+                return $value === $test;
+        }
+
+        throw new InvalidArgumentException('Invalid date comparison operator: "' . $operator . '". Allowed operators: "==", "!=", "<", "<=", ">", ">="');
     },
 
     /**
@@ -267,7 +377,34 @@ V::$validators = [
      * Checks for valid email addresses
      */
     'email' => function ($value): bool {
-        return filter_var($value, FILTER_VALIDATE_EMAIL) !== false;
+        if (filter_var($value, FILTER_VALIDATE_EMAIL) === false) {
+            try {
+                $email = Idn::encodeEmail($value);
+            } catch (Throwable $e) {
+                return false;
+            }
+
+            return filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
+        }
+
+        return true;
+    },
+
+    /**
+     * Checks for empty values
+     */
+    'empty' => function ($value = null): bool {
+        $empty = ['', null, []];
+
+        if (in_array($value, $empty, true) === true) {
+            return true;
+        }
+
+        if (is_countable($value) === true) {
+            return count($value) === 0;
+        }
+
+        return false;
     },
 
     /**
@@ -307,6 +444,19 @@ V::$validators = [
      */
     'ip' => function ($value): bool {
         return filter_var($value, FILTER_VALIDATE_IP) !== false;
+    },
+
+    /**
+     * Checks for valid json
+     */
+    'json' => function ($value): bool {
+        if (!is_string($value) || $value === '') {
+            return false;
+        }
+
+        json_decode($value);
+
+        return json_last_error() === JSON_ERROR_NONE;
     },
 
     /**
@@ -380,6 +530,13 @@ V::$validators = [
     },
 
     /**
+     * Checks that the given value is not empty
+     */
+    'notEmpty' => function ($value): bool {
+        return V::empty($value) === false;
+    },
+
+    /**
      * Checks that the given value is not in the given list of values
      */
     'notIn' => function ($value, $notIn): bool {
@@ -394,11 +551,16 @@ V::$validators = [
     },
 
     /**
-     * Checks if the value is present in the given array
+     * Checks if the value is present
      */
-    'required' => function ($key, array $array): bool {
-        return isset($array[$key]) === true &&
-               V::notIn($array[$key], [null, '', []]) === true;
+    'required' => function ($value, $array = null): bool {
+        // with reference array
+        if (is_array($array) === true) {
+            return isset($array[$value]) === true && V::notEmpty($array[$value]) === true;
+        }
+
+        // without reference array
+        return V::notEmpty($value);
     },
 
     /**
@@ -415,6 +577,12 @@ V::$validators = [
      * Checks that the value has the given size
      */
     'size' => function ($value, $size, $operator = '=='): bool {
+        // if value is field object, first convert it to a readable value
+        // it is important to check at the beginning as the value can be string or numeric
+        if (is_a($value, '\Kirby\Cms\Field') === true) {
+            $value = $value->value();
+        }
+
         if (is_numeric($value) === true) {
             $count = $value;
         } elseif (is_string($value) === true) {
@@ -466,7 +634,8 @@ V::$validators = [
      */
     'url' => function ($value): bool {
         // In search for the perfect regular expression: https://mathiasbynens.be/demo/url-regex
-        $regex = '_^(?:(?:https?|ftp)://)(?:\S+(?::\S*)?@)?(?:(?!10(?:\.\d{1,3}){3})(?!127(?:\.\d{1,3}){3})(?!169\.254(?:\.\d{1,3}){2})(?!192\.168(?:\.\d{1,3}){2})(?!172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))|(?:(?:[a-z\x{00a1}-\x{ffff}0-9]+-?)*[a-z\x{00a1}-\x{ffff}0-9]+)(?:\.(?:[a-z\x{00a1}-\x{ffff}0-9]+-?)*[a-z\x{00a1}-\x{ffff}0-9]+)*(?:\.(?:[a-z\x{00a1}-\x{ffff}]{2,})))(?::\d{2,5})?(?:/[^\s]*)?$_iu';
-        return preg_match($regex, $value) !== 0;
+        // Added localhost support and removed 127.*.*.* ip restriction
+        $regex = '_^(?:(?:https?|ftp):\/\/)(?:\S+(?::\S*)?@)?(?:(?!10(?:\.\d{1,3}){3})(?!169\.254(?:\.\d{1,3}){2})(?!192\.168(?:\.\d{1,3}){2})(?!172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))|(?:localhost)|(?:(?:[a-z\x{00a1}-\x{ffff}0-9]+-?)*[a-z\x{00a1}-\x{ffff}0-9]+)(?:\.(?:[a-z\x{00a1}-\x{ffff}0-9]+-?)*[a-z\x{00a1}-\x{ffff}0-9]+)*(?:\.(?:[a-z\x{00a1}-\x{ffff}]{2,})))(?::\d{2,5})?(?:\/[^\s]*)?$_iu';
+        return preg_match($regex, $value ?? '') !== 0;
     }
 ];

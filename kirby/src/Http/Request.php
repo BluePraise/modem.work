@@ -2,11 +2,9 @@
 
 namespace Kirby\Http;
 
-use Kirby\Http\Request\Auth\BasicAuth;
-use Kirby\Http\Request\Auth\BearerAuth;
+use Kirby\Cms\App;
 use Kirby\Http\Request\Body;
 use Kirby\Http\Request\Files;
-use Kirby\Http\Request\Method;
 use Kirby\Http\Request\Query;
 use Kirby\Toolkit\A;
 use Kirby\Toolkit\Str;
@@ -18,17 +16,22 @@ use Kirby\Toolkit\Str;
  *
  * @package   Kirby Http
  * @author    Bastian Allgeier <bastian@getkirby.com>
- * @link      http://getkirby.com
+ * @link      https://getkirby.com
  * @copyright Bastian Allgeier
- * @license   MIT
+ * @license   https://opensource.org/licenses/MIT
  */
 class Request
 {
+    public static $authTypes = [
+        'basic'   => 'Kirby\Http\Request\Auth\BasicAuth',
+        'bearer'  => 'Kirby\Http\Request\Auth\BearerAuth',
+        'session' => 'Kirby\Http\Request\Auth\SessionAuth',
+    ];
 
     /**
      * The auth object if available
      *
-     * @var BearerAuth|BasicAuth|false|null
+     * @var \Kirby\Http\Request\Auth|false|null
      */
     protected $auth;
 
@@ -62,18 +65,9 @@ class Request
     protected $files;
 
     /**
-     * The Method object is a tiny
-     * wrapper around the request method
-     * name, which will validate and sanitize
-     * the given name and always return
-     * its uppercase version.
+     * The Method type
      *
-     * Examples:
-     *
-     * `$request->method()->name()`
-     * `$request->method()->is('post')`
-     *
-     * @var Method
+     * @var string
      */
     protected $method;
 
@@ -117,31 +111,31 @@ class Request
     public function __construct(array $options = [])
     {
         $this->options = $options;
-        $this->method  = $options['method'] ?? $_SERVER['REQUEST_METHOD'] ?? 'GET';
+        $this->method  = $this->detectRequestMethod($options['method'] ?? null);
 
         if (isset($options['body']) === true) {
-            $this->body = new Body($options['body']);
+            $this->body = is_a($options['body'], Body::class) ? $options['body'] : new Body($options['body']);
         }
 
         if (isset($options['files']) === true) {
-            $this->files = new Files($options['files']);
+            $this->files = is_a($options['files'], Files::class) ? $options['files'] : new Files($options['files']);
         }
 
         if (isset($options['query']) === true) {
-            $this->query = new Query($options['query']);
+            $this->query = is_a($options['query'], Query::class) === true ? $options['query'] : new Query($options['query']);
         }
 
         if (isset($options['url']) === true) {
-            $this->url = new Uri($options['url']);
+            $this->url = is_a($options['url'], Uri::class) === true ? $options['url'] : new Uri($options['url']);
         }
     }
 
     /**
-     * Improved var_dump output
+     * Improved `var_dump` output
      *
      * @return array
      */
-    public function __debuginfo(): array
+    public function __debugInfo(): array
     {
         return [
             'body'   => $this->body(),
@@ -153,19 +147,9 @@ class Request
     }
 
     /**
-     * Detects ajax requests
-     * @deprecated 3.1.0 No longer reliable, especially with the fetch api.
-     * @return boolean
-     */
-    public function ajax(): bool
-    {
-        return (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest');
-    }
-
-    /**
      * Returns the Auth object if authentication is set
      *
-     * @return BasicAuth|BearerAuth|null
+     * @return \Kirby\Http\Request\Auth|null
      */
     public function auth()
     {
@@ -173,16 +157,31 @@ class Request
             return $this->auth;
         }
 
-        if ($auth = $this->options['auth'] ?? $this->header('authorization')) {
-            $type  = Str::before($auth, ' ');
-            $token = Str::after($auth, ' ');
-            $class = 'Kirby\\Http\\Request\\Auth\\' . ucfirst($type) . 'Auth';
+        // lazily request the instance for non-CMS use cases
+        $kirby = App::instance(null, true);
 
-            if (class_exists($class) === false) {
+        // tell the CMS responder that the response relies on
+        // the `Authorization` header and its value (even if
+        // the header isn't set in the current request);
+        // this ensures that the response is only cached for
+        // unauthenticated visitors;
+        // https://github.com/getkirby/kirby/issues/4423#issuecomment-1166300526
+        if ($kirby) {
+            $kirby->response()->usesAuth(true);
+        }
+
+        if ($auth = $this->options['auth'] ?? $this->header('authorization')) {
+            $type = Str::lower(Str::before($auth, ' '));
+            $data = Str::after($auth, ' ');
+
+            $class = static::$authTypes[$type] ?? null;
+            if (!$class || class_exists($class) === false) {
                 return $this->auth = false;
             }
 
-            return $this->auth = new $class($token);
+            $object = new $class($data);
+
+            return $this->auth = $object;
         }
 
         return $this->auth = false;
@@ -191,21 +190,21 @@ class Request
     /**
      * Returns the Body object
      *
-     * @return Body
+     * @return \Kirby\Http\Request\Body
      */
-    public function body(): Body
+    public function body()
     {
-        return $this->body = $this->body ?? new Body();
+        return $this->body ??= new Body();
     }
 
     /**
      * Checks if the request has been made from the command line
      *
-     * @return boolean
+     * @return bool
      */
     public function cli(): bool
     {
-        return Server::cli();
+        return $this->options['cli'] ?? (new Environment())->cli();
     }
 
     /**
@@ -229,10 +228,53 @@ class Request
     }
 
     /**
+     * Detect the request method from various
+     * options: given method, query string, server vars
+     *
+     * @param string $method
+     * @return string
+     */
+    public function detectRequestMethod(string $method = null): string
+    {
+        // all possible methods
+        $methods = ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'CONNECT', 'OPTIONS', 'TRACE', 'PATCH'];
+
+        // the request method can be overwritten with a header
+        $methodOverride = strtoupper(Environment::getGlobally('HTTP_X_HTTP_METHOD_OVERRIDE', ''));
+
+        if ($method === null && in_array($methodOverride, $methods) === true) {
+            $method = $methodOverride;
+        }
+
+        // final chain of options to detect the method
+        $method = $method ?? Environment::getGlobally('REQUEST_METHOD', 'GET');
+
+        // uppercase the shit out of it
+        $method = strtoupper($method);
+
+        // sanitize the method
+        if (in_array($method, $methods) === false) {
+            $method = 'GET';
+        }
+
+        return $method;
+    }
+
+    /**
+     * Returns the domain
+     *
+     * @return string
+     */
+    public function domain(): string
+    {
+        return $this->url()->domain();
+    }
+
+    /**
      * Fetches a single file array
      * from the Files object by key
      *
-     * @param  string $key
+     * @param string $key
      * @return array|null
      */
     public function file(string $key)
@@ -243,11 +285,11 @@ class Request
     /**
      * Returns the Files object
      *
-     * @return Files
+     * @return \Kirby\Cms\Files
      */
-    public function files(): Files
+    public function files()
     {
-        return $this->files = $this->files ?? new Files();
+        return $this->files ??= new Files();
     }
 
     /**
@@ -261,6 +303,20 @@ class Request
     public function get($key = null, $fallback = null)
     {
         return A::get($this->data(), $key, $fallback);
+    }
+
+    /**
+     * Returns whether the request contains
+     * the `Authorization` header
+     * @since 3.7.0
+     *
+     * @return bool
+     */
+    public function hasAuth(): bool
+    {
+        $header = $this->options['auth'] ?? $this->header('authorization');
+
+        return $header !== null;
     }
 
     /**
@@ -286,7 +342,7 @@ class Request
     {
         $headers = [];
 
-        foreach ($_SERVER as $key => $value) {
+        foreach (Environment::getGlobally() as $key => $value) {
             if (substr($key, 0, 5) !== 'HTTP_' && substr($key, 0, 14) !== 'REDIRECT_HTTP_') {
                 continue;
             }
@@ -316,8 +372,8 @@ class Request
      * Checks if the given method name
      * matches the name of the request method.
      *
-     * @param  string  $method
-     * @return boolean
+     * @param string $method
+     * @return bool
      */
     public function is(string $method): bool
     {
@@ -343,19 +399,27 @@ class Request
     }
 
     /**
+     * Shortcut to the Path object
+     */
+    public function path()
+    {
+        return $this->url()->path();
+    }
+
+    /**
      * Returns the Query object
      *
-     * @return Query
+     * @return \Kirby\Http\Request\Query
      */
-    public function query(): Query
+    public function query()
     {
-        return $this->query = $this->query ?? new Query();
+        return $this->query ??= new Query();
     }
 
     /**
      * Checks for a valid SSL connection
      *
-     * @return boolean
+     * @return bool
      */
     public function ssl(): bool
     {
@@ -369,14 +433,14 @@ class Request
      * the original object.
      *
      * @param array $props
-     * @return Uri
+     * @return \Kirby\Http\Uri
      */
-    public function url(array $props = null): Uri
+    public function url(array $props = null)
     {
         if ($props !== null) {
             return $this->url()->clone($props);
         }
 
-        return $this->url = $this->url ?? Uri::current();
+        return $this->url ??= Uri::current();
     }
 }

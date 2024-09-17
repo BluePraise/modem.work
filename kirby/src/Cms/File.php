@@ -2,14 +2,11 @@
 
 namespace Kirby\Cms;
 
-use Kirby\Data\Data;
-use Kirby\Exception\Exception;
-use Kirby\Exception\InvalidArgumentException;
-use Kirby\Image\Image;
+use Kirby\Filesystem\F;
+use Kirby\Filesystem\IsFile;
+use Kirby\Panel\File as Panel;
 use Kirby\Toolkit\A;
-use Kirby\Toolkit\F;
 use Kirby\Toolkit\Str;
-use Throwable;
 
 /**
  * The `$file` object provides a set
@@ -19,52 +16,44 @@ use Throwable;
  * URL or resizing an image. It also
  * handles file meta data.
  *
- * The File class is a wrapper around
- * the Kirby\Image\Image class, which
- * is used to handle all file methods.
+ * The File class proxies the `Kirby\Filesystem\File`
+ * or `Kirby\Image\Image` class, which
+ * is used to handle all asset file methods.
  * In addition the File class handles
- * File meta data via Kirby\Cms\Content.
+ * meta data via `Kirby\Cms\Content`.
  *
  * @package   Kirby Cms
  * @author    Bastian Allgeier <bastian@getkirby.com>
- * @link      http://getkirby.com
+ * @link      https://getkirby.com
  * @copyright Bastian Allgeier
+ * @license   https://getkirby.com/license
  */
 class File extends ModelWithContent
 {
-    const CLASS_ALIAS = 'file';
-
     use FileActions;
-    use FileFoundation;
     use FileModifications;
     use HasMethods;
     use HasSiblings;
+    use IsFile;
 
-    /**
-     * The parent asset object
-     * This is used to do actual file
-     * method calls, like size, mime, etc.
-     *
-     * @var Image
-     */
-    protected $asset;
+    public const CLASS_ALIAS = 'file';
 
     /**
      * Cache for the initialized blueprint object
      *
-     * @var FileBlueprint
+     * @var \Kirby\Cms\FileBlueprint
      */
     protected $blueprint;
 
     /**
      * @var string
      */
-    protected $id;
+    protected $filename;
 
     /**
      * @var string
      */
-    protected $filename;
+    protected $id;
 
     /**
      * All registered file methods
@@ -76,7 +65,7 @@ class File extends ModelWithContent
     /**
      * The parent object
      *
-     * @var Model
+     * @var \Kirby\Cms\Model
      */
     protected $parent;
 
@@ -125,7 +114,7 @@ class File extends ModelWithContent
         }
 
         // content fields
-        return $this->content()->get($method, $arguments);
+        return $this->content()->get($method);
     }
 
     /**
@@ -135,16 +124,20 @@ class File extends ModelWithContent
      */
     public function __construct(array $props)
     {
-        // properties
+        // set filename as the most important prop first
+        // TODO: refactor later to avoid redundant prop setting
+        $this->setProperty('filename', $props['filename'] ?? null, true);
+
+        // set other properties
         $this->setProperties($props);
     }
 
     /**
-     * Improved var_dump() output
+     * Improved `var_dump` output
      *
      * @return array
      */
-    public function __debuginfo(): array
+    public function __debugInfo(): array
     {
         return array_merge($this->toArray(), [
             'content'  => $this->content(),
@@ -165,22 +158,11 @@ class File extends ModelWithContent
     }
 
     /**
-     * Returns the Image object
-     *
-     * @internal
-     * @return Image
-     */
-    public function asset(): Image
-    {
-        return $this->asset = $this->asset ?? new Image($this->root());
-    }
-
-    /**
      * Returns the FileBlueprint object for the file
      *
-     * @return FileBlueprint
+     * @return \Kirby\Cms\FileBlueprint
      */
-    public function blueprint(): FileBlueprint
+    public function blueprint()
     {
         if (is_a($this->blueprint, 'Kirby\Cms\FileBlueprint') === true) {
             return $this->blueprint;
@@ -192,7 +174,7 @@ class File extends ModelWithContent
     /**
      * Store the template in addition to the
      * other content.
-
+     *
      * @internal
      * @param array $data
      * @param string|null $languageCode
@@ -229,35 +211,15 @@ class File extends ModelWithContent
     }
 
     /**
-     * Provides a kirbytag or markdown
-     * tag for the file, which will be
-     * used in the panel, when the file
-     * gets dragged onto a textarea
+     * Constructs a File object
      *
      * @internal
-     * @param string $type
-     * @param bool $absolute
-     * @return string
+     * @param mixed $props
+     * @return static
      */
-    public function dragText($type = 'kirbytext', bool $absolute = false): string
+    public static function factory($props)
     {
-        $url = $absolute ? $this->id() : $this->filename();
-
-        switch ($type) {
-            case 'kirbytext':
-                if ($this->type() === 'image') {
-                    return '(image: ' . $url . ')';
-                } else {
-                    return '(file: ' . $url . ')';
-                }
-                // no break
-            case 'markdown':
-                if ($this->type() === 'image') {
-                    return '![' . $this->alt() . '](' . $url . ')';
-                } else {
-                    return '[' . $this->filename() . '](' . $url . ')';
-                }
-        }
+        return new static($props);
     }
 
     /**
@@ -273,11 +235,25 @@ class File extends ModelWithContent
     /**
      * Returns the parent Files collection
      *
-     * @return Files
+     * @return \Kirby\Cms\Files
      */
-    public function files(): Files
+    public function files()
     {
         return $this->siblingsCollection();
+    }
+
+    /**
+     * Converts the file to html
+     *
+     * @param array $attr
+     * @return string
+     */
+    public function html(array $attr = []): string
+    {
+        return $this->asset()->html(array_merge(
+            ['alt' => $this->alt()],
+            $attr
+        ));
     }
 
     /**
@@ -303,7 +279,7 @@ class File extends ModelWithContent
     /**
      * Compares the current object with the given file object
      *
-     * @param File $file
+     * @param \Kirby\Cms\File $file
      * @return bool
      */
     public function is(File $file): bool
@@ -312,14 +288,32 @@ class File extends ModelWithContent
     }
 
     /**
-     * Create a unique media hash
+     * Check if the file can be read by the current user
+     *
+     * @return bool
+     */
+    public function isReadable(): bool
+    {
+        static $readable = [];
+
+        $template = $this->template();
+
+        if (isset($readable[$template]) === true) {
+            return $readable[$template];
+        }
+
+        return $readable[$template] = $this->permissions()->can('read');
+    }
+
+    /**
+     * Creates a unique media hash
      *
      * @internal
      * @return string
      */
     public function mediaHash(): string
     {
-        return crc32($this->filename()) . '-' . $this->modified();
+        return $this->mediaToken() . '-' . $this->modifiedFile();
     }
 
     /**
@@ -334,6 +328,18 @@ class File extends ModelWithContent
     }
 
     /**
+     * Creates a non-guessable token string for this file
+     *
+     * @internal
+     * @return string
+     */
+    public function mediaToken(): string
+    {
+        $token = $this->kirby()->contentToken($this, $this->id());
+        return substr($token, 0, 10);
+    }
+
+    /**
      * Returns the absolute Url to the file in the public media folder
      *
      * @internal
@@ -345,54 +351,50 @@ class File extends ModelWithContent
     }
 
     /**
-     * @deprecated 3.0.0 Use `File::content()` instead
-     *
-     * @return Content
-     */
-    public function meta(): Content
-    {
-        return $this->content();
-    }
-
-    /**
-     * Returns the parent model.
-     * This is normally the parent page
-     * or the site object.
-     *
-     * @internal
-     * @return Site|Page
-     */
-    public function model()
-    {
-        return $this->parent();
-    }
-
-    /**
      * Get the file's last modification time.
      *
-     * @param  string $format
-     * @param  string|null $handler date or strftime
+     * @param string|\IntlDateFormatter|null $format
+     * @param string|null $handler date, intl or strftime
+     * @param string|null $languageCode
      * @return mixed
      */
-    public function modified(string $format = null, string $handler = null)
+    public function modified($format = null, string $handler = null, string $languageCode = null)
     {
-        $file     = F::modified($this->root());
-        $content  = F::modified($this->contentFile());
+        $file     = $this->modifiedFile();
+        $content  = $this->modifiedContent($languageCode);
         $modified = max($file, $content);
+        $handler ??= $this->kirby()->option('date.handler', 'date');
 
-        if (is_null($format) === true) {
-            return $modified;
-        }
+        return Str::date($modified, $format, $handler);
+    }
 
-        $handler = $handler ?? $this->kirby()->option('date.handler', 'date');
+    /**
+     * Timestamp of the last modification
+     * of the content file
+     *
+     * @param string|null $languageCode
+     * @return int
+     */
+    protected function modifiedContent(string $languageCode = null): int
+    {
+        return F::modified($this->contentFile($languageCode));
+    }
 
-        return $handler($format, $modified);
+    /**
+     * Timestamp of the last modification
+     * of the source file
+     *
+     * @return int
+     */
+    protected function modifiedFile(): int
+    {
+        return F::modified($this->root());
     }
 
     /**
      * Returns the parent Page object
      *
-     * @return Page
+     * @return \Kirby\Cms\Page|null
      */
     public function page()
     {
@@ -400,193 +402,58 @@ class File extends ModelWithContent
     }
 
     /**
-     * Panel icon definition
+     * Returns the panel info object
      *
-     * @internal
-     * @param array $params
-     * @return array
+     * @return \Kirby\Panel\File
      */
-    public function panelIcon(array $params = null): array
+    public function panel()
     {
-        $colorBlue   = '#81a2be';
-        $colorPurple = '#b294bb';
-        $colorOrange = '#de935f';
-        $colorGreen  = '#a7bd68';
-        $colorAqua   = '#8abeb7';
-        $colorYellow = '#f0c674';
-        $colorRed    = '#d16464';
-        $colorWhite  = '#c5c9c6';
-
-        $types = [
-            'image'    => ['color' => $colorOrange, 'type' => 'file-image'],
-            'video'    => ['color' => $colorYellow, 'type' => 'file-video'],
-            'document' => ['color' => $colorRed, 'type' => 'file-document'],
-            'audio'    => ['color' => $colorAqua, 'type' => 'file-audio'],
-            'code'     => ['color' => $colorBlue, 'type' => 'file-code'],
-            'archive'  => ['color' => $colorWhite, 'type' => 'file-zip'],
-        ];
-
-        $extensions = [
-            'indd'  => ['color' => $colorPurple],
-            'xls'   => ['color' => $colorGreen, 'type' => 'file-spreadsheet'],
-            'xlsx'  => ['color' => $colorGreen, 'type' => 'file-spreadsheet'],
-            'csv'   => ['color' => $colorGreen, 'type' => 'file-spreadsheet'],
-            'docx'  => ['color' => $colorBlue, 'type' => 'file-word'],
-            'doc'   => ['color' => $colorBlue, 'type' => 'file-word'],
-            'rtf'   => ['color' => $colorBlue, 'type' => 'file-word'],
-            'mdown' => ['type' => 'file-text'],
-            'md'    => ['type' => 'file-text']
-        ];
-
-        $definition = array_merge($types[$this->type()] ?? [], $extensions[$this->extension()] ?? []);
-
-        return [
-            'type'  => $definition['type'] ?? 'file',
-            'color' => $definition['color'] ?? $colorWhite,
-            'back'  => $params['back'] ?? 'pattern',
-            'ratio' => $params['ratio'] ?? null,
-        ];
-    }
-
-    /**
-     * Panel image definition
-     *
-     * @internal
-     * @param string|array|false $settings
-     * @param array $thumbSettings
-     * @return array
-     */
-    public function panelImage($settings = null, array $thumbSettings = null): ?array
-    {
-        $defaults = [
-            'ratio' => '3/2',
-            'back'  => 'pattern',
-            'cover' => false
-        ];
-
-        // switch the image off
-        if ($settings === false) {
-            return null;
-        }
-
-        if (is_string($settings) === true) {
-            $settings = [
-                'query' => $settings
-            ];
-        }
-
-        $image = $this->query($settings['query'] ?? null, 'Kirby\Cms\File');
-
-        if ($image === null && $this->isViewable() === true) {
-            $image = $this;
-        }
-
-        if ($image) {
-            $settings['url'] = $image->thumb($thumbSettings)->url(true);
-            unset($settings['query']);
-        }
-
-        return array_merge($defaults, (array)$settings);
-    }
-
-    /**
-     * Returns the full path without leading slash
-     *
-     * @internal
-     * @return string
-     */
-    public function panelPath(): string
-    {
-        return 'files/' . $this->filename();
-    }
-
-    /**
-     * Returns the url to the editing view
-     * in the panel
-     *
-     * @internal
-     * @param bool $relative
-     * @return string
-     */
-    public function panelUrl(bool $relative = false): string
-    {
-        return $this->parent()->panelUrl($relative) . '/' . $this->panelPath();
+        return new Panel($this);
     }
 
     /**
      * Returns the parent Model object
      *
-     * @return Model
+     * @return \Kirby\Cms\Model
      */
     public function parent()
     {
-        return $this->parent = $this->parent ?? $this->kirby()->site();
+        return $this->parent ??= $this->kirby()->site();
     }
 
     /**
      * Returns the parent id if a parent exists
      *
      * @internal
-     * @return string|null
+     * @return string
      */
-    public function parentId(): ?string
+    public function parentId(): string
     {
-        if ($parent = $this->parent()) {
-            return $parent->id();
-        }
-
-        return null;
+        return $this->parent()->id();
     }
 
     /**
      * Returns a collection of all parent pages
      *
-     * @return Pages
+     * @return \Kirby\Cms\Pages
      */
-    public function parents(): Pages
+    public function parents()
     {
         if (is_a($this->parent(), 'Kirby\Cms\Page') === true) {
             return $this->parent()->parents()->prepend($this->parent()->id(), $this->parent());
         }
 
-        return new Pages;
+        return new Pages();
     }
 
     /**
      * Returns the permissions object for this file
      *
-     * @return FilePermissions
+     * @return \Kirby\Cms\FilePermissions
      */
     public function permissions()
     {
         return new FilePermissions($this);
-    }
-
-    /**
-     * Creates a string query, starting from the model
-     *
-     * @internal
-     * @param string|null $query
-     * @param string|null $expect
-     * @return mixed
-     */
-    public function query(string $query = null, string $expect = null)
-    {
-        if ($query === null) {
-            return null;
-        }
-
-        $result = Str::query($query, [
-            'kirby' => $this->kirby(),
-            'site'  => $this->site(),
-            'file'  => $this
-        ]);
-
-        if ($expect !== null && is_a($result, $expect) !== true) {
-            return null;
-        }
-
-        return $result;
     }
 
     /**
@@ -596,14 +463,14 @@ class File extends ModelWithContent
      */
     public function root(): ?string
     {
-        return $this->root = $this->root ?? $this->parent()->root() . '/' . $this->filename();
+        return $this->root ??= $this->parent()->root() . '/' . $this->filename();
     }
 
     /**
      * Returns the FileRules class to
      * validate any important action.
      *
-     * @return FileRules
+     * @return \Kirby\Cms\FileRules
      */
     protected function rules()
     {
@@ -614,9 +481,9 @@ class File extends ModelWithContent
      * Sets the Blueprint object
      *
      * @param array|null $blueprint
-     * @return self
+     * @return $this
      */
-    protected function setBlueprint(array $blueprint = null): self
+    protected function setBlueprint(array $blueprint = null)
     {
         if ($blueprint !== null) {
             $blueprint['model'] = $this;
@@ -630,9 +497,9 @@ class File extends ModelWithContent
      * Sets the filename
      *
      * @param string $filename
-     * @return self
+     * @return $this
      */
-    protected function setFilename(string $filename): self
+    protected function setFilename(string $filename)
     {
         $this->filename = $filename;
         return $this;
@@ -641,10 +508,10 @@ class File extends ModelWithContent
     /**
      * Sets the parent model object
      *
-     * @param Model $parent
-     * @return self
+     * @param \Kirby\Cms\Model $parent
+     * @return $this
      */
-    protected function setParent(Model $parent = null): self
+    protected function setParent(Model $parent)
     {
         $this->parent = $parent;
         return $this;
@@ -655,7 +522,7 @@ class File extends ModelWithContent
      * auto root detection
      *
      * @param string|null $root
-     * @return self
+     * @return $this
      */
     protected function setRoot(string $root = null)
     {
@@ -664,10 +531,10 @@ class File extends ModelWithContent
     }
 
     /**
-     * @param string $template
-     * @return self
+     * @param string|null $template
+     * @return $this
      */
-    protected function setTemplate(string $template = null): self
+    protected function setTemplate(string $template = null)
     {
         $this->template = $template;
         return $this;
@@ -676,10 +543,10 @@ class File extends ModelWithContent
     /**
      * Sets the url
      *
-     * @param string $url
-     * @return self
+     * @param string|null $url
+     * @return $this
      */
-    protected function setUrl(string $url = null): self
+    protected function setUrl(string $url = null)
     {
         $this->url = $url;
         return $this;
@@ -689,7 +556,7 @@ class File extends ModelWithContent
      * Returns the parent Files collection
      * @internal
      *
-     * @return Files
+     * @return \Kirby\Cms\Files
      */
     protected function siblingsCollection()
     {
@@ -699,9 +566,9 @@ class File extends ModelWithContent
     /**
      * Returns the parent Site object
      *
-     * @return Site
+     * @return \Kirby\Cms\Site
      */
-    public function site(): Site
+    public function site()
     {
         return is_a($this->parent(), 'Kirby\Cms\Site') === true ? $this->parent() : $this->kirby()->site();
     }
@@ -713,18 +580,18 @@ class File extends ModelWithContent
      */
     public function template(): ?string
     {
-        return $this->template = $this->template ?? $this->content()->get('template')->value();
+        return $this->template ??= $this->content()->get('template')->value();
     }
 
     /**
      * Returns siblings with the same template
      *
      * @param bool $self
-     * @return self
+     * @return \Kirby\Cms\Files
      */
     public function templateSiblings(bool $self = true)
     {
-        return $this->siblings($self)->filterBy('template', $this->template());
+        return $this->siblings($self)->filter('template', $this->template());
     }
 
     /**
@@ -740,31 +607,147 @@ class File extends ModelWithContent
     }
 
     /**
-     * String template builder
-     *
-     * @param string|null $template
-     * @return string
-     */
-    public function toString(string $template = null): string
-    {
-        if ($template === null) {
-            return $this->id();
-        }
-
-        return Str::template($template, [
-            'file'  => $this,
-            'site'  => $this->site(),
-            'kirby' => $this->kirby()
-        ]);
-    }
-
-    /**
      * Returns the Url
      *
      * @return string
      */
     public function url(): string
     {
-        return $this->url ?? $this->url = $this->kirby()->component('file::url')($this->kirby(), $this);
+        return $this->url ??= ($this->kirby()->component('file::url'))($this->kirby(), $this);
+    }
+
+
+    /**
+     * Deprecated!
+     */
+
+    /**
+     * Provides a kirbytag or markdown
+     * tag for the file, which will be
+     * used in the panel, when the file
+     * gets dragged onto a textarea
+     *
+     * @todo Remove in 3.8.0
+     *
+     * @internal
+     * @param string|null $type (null|auto|kirbytext|markdown)
+     * @param bool $absolute
+     * @return string
+     * @codeCoverageIgnore
+     */
+    public function dragText(string $type = null, bool $absolute = false): string
+    {
+        Helpers::deprecated('Cms\File::dragText() has been deprecated and will be removed in Kirby 3.8.0. Use $file->panel()->dragText() instead.');
+        return $this->panel()->dragText($type, $absolute);
+    }
+
+    /**
+     * Returns an array of all actions
+     * that can be performed in the Panel
+     *
+     * @todo Remove in 3.8.0
+     *
+     * @since 3.3.0 This also checks for the lock status
+     * @since 3.5.1 This also checks for matching accept settings
+     *
+     * @param array $unlock An array of options that will be force-unlocked
+     * @return array
+     * @codeCoverageIgnore
+     */
+    public function panelOptions(array $unlock = []): array
+    {
+        Helpers::deprecated('Cms\File::panelOptions() has been deprecated and will be removed in Kirby 3.8.0. Use $file->panel()->options() instead.');
+        return $this->panel()->options($unlock);
+    }
+
+    /**
+     * Returns the full path without leading slash
+     *
+     * @todo Remove in 3.8.0
+     *
+     * @internal
+     * @return string
+     * @codeCoverageIgnore
+     */
+    public function panelPath(): string
+    {
+        Helpers::deprecated('Cms\File::panelPath() has been deprecated and will be removed in Kirby 3.8.0. Use $file->panel()->path() instead.');
+        return $this->panel()->path();
+    }
+
+    /**
+     * Prepares the response data for file pickers
+     * and file fields
+     *
+     * @todo Remove in 3.8.0
+     *
+     * @param array|null $params
+     * @return array
+     * @codeCoverageIgnore
+     */
+    public function panelPickerData(array $params = []): array
+    {
+        Helpers::deprecated('Cms\File::panelPickerData() has been deprecated and will be removed in Kirby 3.8.0. Use $file->panel()->pickerData() instead.');
+        return $this->panel()->pickerData($params);
+    }
+
+    /**
+     * Returns the url to the editing view
+     * in the panel
+     *
+     * @todo Remove in 3.8.0
+     *
+     * @internal
+     * @param bool $relative
+     * @return string
+     * @codeCoverageIgnore
+     */
+    public function panelUrl(bool $relative = false): string
+    {
+        Helpers::deprecated('Cms\File::panelUrl() has been deprecated and will be removed in Kirby 3.8.0. Use $file->panel()->url() instead.');
+        return $this->panel()->url($relative);
+    }
+
+    /**
+     * Simplified File URL that uses the parent
+     * Page URL and the filename as a more stable
+     * alternative for the media URLs.
+     *
+     * @return string
+     */
+    public function previewUrl(): string
+    {
+        $parent = $this->parent();
+        $url    = Url::to($this->id());
+
+        switch ($parent::CLASS_ALIAS) {
+            case 'page':
+                $preview = $parent->blueprint()->preview();
+
+                // the page has a custom preview setting,
+                // thus the file is only accessible through
+                // the direct media URL
+                if ($preview !== true) {
+                    return $this->url();
+                }
+
+                // it's more stable to access files for drafts
+                // through their direct URL to avoid conflicts
+                // with draft token verification
+                if ($parent->isDraft() === true) {
+                    return $this->url();
+                }
+
+                // checks `file::url` component is extended
+                if ($this->kirby()->isNativeComponent('file::url') === false) {
+                    return $this->url();
+                }
+
+                return $url;
+            case 'user':
+                return $this->url();
+            default:
+                return $url;
+        }
     }
 }

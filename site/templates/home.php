@@ -1,7 +1,6 @@
 <?php if (
 !kirby()
-  ->request()
-  ->ajax()
+  ->visitor()->prefersJson()
 ): ?>
 <?php snippet('header'); ?>
 
@@ -11,7 +10,7 @@
     <?php
     $projects = page('projects')
       ->children()
-      ->visible();
+      ->listed();
     $i = 0;
     foreach ($projects->images() as $image):
       if ($image->inHero() == 'true'):
@@ -49,9 +48,7 @@
   <section class="projects-section" id="projects">
 
     <ul class="showcase grid-layout">
-      <?php endif; ?>
       <?php snippet('project'); ?>
-      <?php if (!kirby()->request()->ajax()): ?>
     </ul>
   </section>
 

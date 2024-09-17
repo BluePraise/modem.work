@@ -2,9 +2,17 @@
 
 namespace Kirby\Cms;
 
+/**
+ * PageBlueprint
+ *
+ * @package   Kirby Cms
+ * @author    Bastian Allgeier <bastian@getkirby.com>
+ * @link      https://getkirby.com
+ * @copyright Bastian Allgeier
+ * @license   https://getkirby.com/license
+ */
 class PageBlueprint extends Blueprint
 {
-
     /**
      * Creates a new page blueprint object
      * with the given props
@@ -17,7 +25,7 @@ class PageBlueprint extends Blueprint
 
         // normalize all available page options
         $this->props['options'] = $this->normalizeOptions(
-            $props['options'] ?? true,
+            $this->props['options'] ?? true,
             // defaults
             [
                 'changeSlug'     => null,
@@ -26,6 +34,7 @@ class PageBlueprint extends Blueprint
                 'changeTitle'    => null,
                 'create'         => null,
                 'delete'         => null,
+                'duplicate'      => null,
                 'read'           => null,
                 'preview'        => null,
                 'sort'           => null,
@@ -41,10 +50,10 @@ class PageBlueprint extends Blueprint
         );
 
         // normalize the ordering number
-        $this->props['num'] = $this->normalizeNum($props['num'] ?? 'default');
+        $this->props['num'] = $this->normalizeNum($this->props['num'] ?? 'default');
 
         // normalize the available status array
-        $this->props['status'] = $this->normalizeStatus($props['status'] ?? null);
+        $this->props['status'] = $this->normalizeStatus($this->props['status'] ?? null);
     }
 
     /**
@@ -66,7 +75,6 @@ class PageBlueprint extends Blueprint
     protected function normalizeNum($num): string
     {
         $aliases = [
-            0      => 'zero',
             '0'    => 'zero',
             'sort' => 'default',
         ];
@@ -172,11 +180,11 @@ class PageBlueprint extends Blueprint
 
     /**
      * Returns the preview settings
-     * The preview setting controlls the "Open"
+     * The preview setting controls the "Open"
      * button in the panel and redirects it to a
      * different URL if necessary.
      *
-     * @return string|boolean
+     * @return string|bool
      */
     public function preview()
     {

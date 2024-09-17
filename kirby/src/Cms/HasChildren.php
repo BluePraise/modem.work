@@ -2,29 +2,38 @@
 
 namespace Kirby\Cms;
 
+use Kirby\Filesystem\Dir;
 use Kirby\Toolkit\Str;
 
+/**
+ * HasChildren
+ *
+ * @package   Kirby Cms
+ * @author    Bastian Allgeier <bastian@getkirby.com>
+ * @link      https://getkirby.com
+ * @copyright Bastian Allgeier
+ * @license   https://getkirby.com/license
+ */
 trait HasChildren
 {
-
     /**
-     * The Pages collection
+     * The list of available published children
      *
-     * @var Pages
+     * @var \Kirby\Cms\Pages
      */
     public $children;
 
     /**
-     * The list of available drafts
+     * The list of available draft children
      *
-     * @var Pages
+     * @var \Kirby\Cms\Pages
      */
     public $drafts;
 
     /**
-     * Returns the Pages collection
+     * Returns all published children
      *
-     * @return Pages
+     * @return \Kirby\Cms\Pages
      */
     public function children()
     {
@@ -36,9 +45,9 @@ trait HasChildren
     }
 
     /**
-     * Returns all children and drafts at the same time
+     * Returns all published and draft children at the same time
      *
-     * @return Pages
+     * @return \Kirby\Cms\Pages
      */
     public function childrenAndDrafts()
     {
@@ -46,8 +55,8 @@ trait HasChildren
     }
 
     /**
-     * Return a list of ids for the model's
-     * toArray method
+     * Returns a list of IDs for the model's
+     * `toArray` method
      *
      * @return array
      */
@@ -57,10 +66,10 @@ trait HasChildren
     }
 
     /**
-     * Searches for a child draft by id
+     * Searches for a draft child by ID
      *
      * @param string $path
-     * @return Page|null
+     * @return \Kirby\Cms\Page|null
      */
     public function draft(string $path)
     {
@@ -91,9 +100,9 @@ trait HasChildren
     }
 
     /**
-     * Return all drafts of the model
+     * Returns all draft children
      *
-     * @return Pages
+     * @return \Kirby\Cms\Pages
      */
     public function drafts()
     {
@@ -115,10 +124,10 @@ trait HasChildren
     }
 
     /**
-     * Finds one or multiple children by id
+     * Finds one or multiple published children by ID
      *
      * @param string ...$arguments
-     * @return Pages
+     * @return \Kirby\Cms\Page|\Kirby\Cms\Pages|null
      */
     public function find(...$arguments)
     {
@@ -126,9 +135,10 @@ trait HasChildren
     }
 
     /**
-     * Finds a single page or draft
+     * Finds a single published or draft child
      *
-     * @return Page|null
+     * @param string $path
+     * @return \Kirby\Cms\Page|null
      */
     public function findPageOrDraft(string $path)
     {
@@ -136,19 +146,19 @@ trait HasChildren
     }
 
     /**
-     * Returns a collection of all children of children
+     * Returns a collection of all published children of published children
      *
-     * @return Pages
+     * @return \Kirby\Cms\Pages
      */
-    public function grandChildren(): Pages
+    public function grandChildren()
     {
         return $this->children()->children();
     }
 
     /**
-     * Checks if the model has any children
+     * Checks if the model has any published children
      *
-     * @return boolean
+     * @return bool
      */
     public function hasChildren(): bool
     {
@@ -156,9 +166,9 @@ trait HasChildren
     }
 
     /**
-     * Checks if the model has any drafts
+     * Checks if the model has any draft children
      *
-     * @return boolean
+     * @return bool
      */
     public function hasDrafts(): bool
     {
@@ -166,18 +176,9 @@ trait HasChildren
     }
 
     /**
-     * @deprecated 3.0.0 Use `Page::hasUnlistedChildren` instead
-     * @return boolean
-     */
-    public function hasInvisibleChildren(): bool
-    {
-        return $this->children()->invisible()->count() > 0;
-    }
-
-    /**
      * Checks if the page has any listed children
      *
-     * @return boolean
+     * @return bool
      */
     public function hasListedChildren(): bool
     {
@@ -187,7 +188,7 @@ trait HasChildren
     /**
      * Checks if the page has any unlisted children
      *
-     * @return boolean
+     * @return bool
      */
     public function hasUnlistedChildren(): bool
     {
@@ -195,21 +196,12 @@ trait HasChildren
     }
 
     /**
-     * @deprecated 3.0.0 Use `Page::hasListedChildren` instead
-     * @return boolean
-     */
-    public function hasVisibleChildren(): bool
-    {
-        return $this->children()->listed()->count() > 0;
-    }
-
-    /**
      * Creates a flat child index
      *
-     * @param bool $drafts
-     * @return Pages
+     * @param bool $drafts If set to `true`, draft children are included
+     * @return \Kirby\Cms\Pages
      */
-    public function index(bool $drafts = false): Pages
+    public function index(bool $drafts = false)
     {
         if ($drafts === true) {
             return $this->childrenAndDrafts()->index($drafts);
@@ -219,10 +211,10 @@ trait HasChildren
     }
 
     /**
-     * Sets the Children collection
+     * Sets the published children collection
      *
      * @param array|null $children
-     * @return self
+     * @return $this
      */
     protected function setChildren(array $children = null)
     {
@@ -234,10 +226,10 @@ trait HasChildren
     }
 
     /**
-     * Sets the Drafts collection
+     * Sets the draft children collection
      *
      * @param array|null $drafts
-     * @return self
+     * @return $this
      */
     protected function setDrafts(array $drafts = null)
     {

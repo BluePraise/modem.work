@@ -1,0 +1,12 @@
+type: pages
+headline: Project Images
+parent: site.find("projects")
+size: tiny
+info: "{{ page.images.count }} image(s)"
+layout: cards
+template: images
+empty: No albums yet
+image:
+  query: page.cover
+  cover: true
+  ratio: 5/4

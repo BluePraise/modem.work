@@ -1,5 +1,6 @@
 <?php
 
+
 /**
  * Site Routes
  */
@@ -22,7 +23,7 @@ return [
         'pattern' => 'site/children',
         'method'  => 'GET',
         'action'  => function () {
-            return $this->site()->children();
+            return $this->pages(null, $this->requestQuery('status'));
         }
     ],
     [
@@ -33,17 +34,24 @@ return [
         }
     ],
     [
-        'pattern' => 'site/children/blueprints',
-        'method'  => 'GET',
+        'pattern' => 'site/children/search',
+        'method'  => 'GET|POST',
         'action'  => function () {
-            return $this->site()->blueprints($this->requestQuery('section'));
+            return $this->searchPages();
         }
     ],
     [
-        'pattern' => 'site/children/search',
-        'method'  => 'POST',
+        'pattern' => 'site/blueprint',
+        'method'  => 'GET',
         'action'  => function () {
-            return $this->site()->children()->query($this->requestBody());
+            return $this->site()->blueprint();
+        }
+    ],
+    [
+        'pattern' => 'site/blueprints',
+        'method'  => 'GET',
+        'action'  => function () {
+            return $this->site()->blueprints($this->requestQuery('section'));
         }
     ],
     [
@@ -67,7 +75,7 @@ return [
             $pages = $this
                 ->site()
                 ->index(true)
-                ->filterBy('isReadable', true);
+                ->filter('isReadable', true);
 
             if ($this->requestMethod() === 'GET') {
                 return $pages->search($this->requestQuery('q'));

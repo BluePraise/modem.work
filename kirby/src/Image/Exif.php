@@ -9,16 +9,15 @@ use Kirby\Toolkit\V;
  *
  * @package   Kirby Image
  * @author    Bastian Allgeier <bastian@getkirby.com>
- * @link      http://getkirby.com
+ * @link      https://getkirby.com
  * @copyright Bastian Allgeier
- * @license   MIT
+ * @license   https://opensource.org/licenses/MIT
  */
 class Exif
 {
-
     /**
      * the parent image object
-     * @var Image
+     * @var \Kirby\Image\Image
      */
     protected $image;
 
@@ -84,7 +83,7 @@ class Exif
     /**
      * Constructor
      *
-     * @param Image $image
+     * @param \Kirby\Image\Image $image
      */
     public function __construct(Image $image)
     {
@@ -106,7 +105,7 @@ class Exif
     /**
      * Returns the Camera object
      *
-     * @return Camera|null
+     * @return \Kirby\Image\Camera|null
      */
     public function camera()
     {
@@ -120,7 +119,7 @@ class Exif
     /**
      * Returns the location object
      *
-     * @return Location|null
+     * @return \Kirby\Image\Location|null
      */
     public function location()
     {
@@ -174,7 +173,7 @@ class Exif
     /**
      * Checks if this is a color picture
      *
-     * @return boolean|null
+     * @return bool|null
      */
     public function isColor()
     {
@@ -184,9 +183,9 @@ class Exif
     /**
      * Checks if this is a bw picture
      *
-     * @return boolean|null
+     * @return bool|null
      */
-    public function isBW(): bool
+    public function isBW(): ?bool
     {
         return ($this->isColor !== null) ? $this->isColor === false : null;
     }
@@ -208,9 +207,11 @@ class Exif
      */
     protected function read(): array
     {
+        // @codeCoverageIgnoreStart
         if (function_exists('exif_read_data') === false) {
             return [];
         }
+        // @codeCoverageIgnoreEnd
 
         $data = @exif_read_data($this->image->root());
         return is_array($data) ? $data : [];
@@ -254,7 +255,7 @@ class Exif
     }
 
     /**
-     * Teturn the focal length
+     * Return the focal length
      *
      * @return string|null
      */
@@ -283,11 +284,11 @@ class Exif
     }
 
     /**
-     * Improved var_dump() output
+     * Improved `var_dump` output
      *
      * @return array
      */
-    public function __debuginfo(): array
+    public function __debugInfo(): array
     {
         return array_merge($this->toArray(), [
             'camera'   => $this->camera(),

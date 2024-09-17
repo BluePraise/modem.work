@@ -1,0 +1,39 @@
+Title: Theory of Forms
+
+----
+
+Order: 4
+
+----
+
+Year: 2019
+
+----
+
+Location: New York, NY
+
+----
+
+Author: 
+
+- k@modem.work
+
+----
+
+Tags: Design, Fabrication
+
+----
+
+Headline: Theory of Forms
+
+----
+
+Excerptedtext: Text—codes, standards, and specifications—shape the form of contemporary buildings in a measure far greater than lines.
+
+----
+
+Text: 
+
+Text—codes, standards, and specifications—shape the form of contemporary buildings in a measure far greater than lines.  We depict the public realm of several historical examples—Stonehenge, the Pantheon, the Hirshhorn Museum and Apple Park—using the text of the written regulations governing their construction and use.  In the buildings' shadows, we reveal another kind of text, expressing the buildings' physical affinity outside of time and circumstance; the mathematical constant, pi.  Made from mechanical impressions by a typewriter, the drawings are precise, but at a very poor resolution; they question our increasing assumptions about the detail and precision that we use to describe our environment, and the truthfulness and quality of the depictions that result.
+
+An invited contribution to the show Drawing Codes: Experimental Forms of Architectural Representation, organized by the CCA Digital Crafts lab and exhibited at CCA San Francisco, the Cooper Union, and the University of Virginia School of Architecture.

@@ -1,9 +1,16 @@
 <?php
 
+use Kirby\Data\Data;
 use Kirby\Toolkit\A;
 
 return [
-    'mixins' => ['min'],
+    'mixins' => [
+        'filepicker',
+        'layout',
+        'min',
+        'picker',
+        'upload'
+    ],
     'props' => [
         /**
          * Unset inherited props
@@ -19,76 +26,6 @@ return [
          */
         'default' => function ($default = null) {
             return $default;
-        },
-
-        /**
-         * The placeholder text if no pages have been selected yet
-         */
-        'empty' => function ($empty = null) {
-            return I18n::translate($empty, $empty);
-        },
-
-        /**
-         * Image settings for each item
-         */
-        'image' => function (array $image = null) {
-            return $image ?? [];
-        },
-
-        /**
-         * Info text
-         */
-        'info' => function (string $info = null) {
-            return $info;
-        },
-
-        /**
-         * Changes the layout of the selected files. Available layouts: list, cards
-         */
-        'layout' => function (string $layout = 'list') {
-            return $layout;
-        },
-
-        /**
-         * Minimum number of required files
-         */
-        'min' => function (int $min = null) {
-            return $min;
-        },
-
-        /**
-         * Maximum number of allowed files
-         */
-        'max' => function (int $max = null) {
-            return $max;
-        },
-
-        /**
-         * If false, only a single file can be selected
-         */
-        'multiple' => function (bool $multiple = true) {
-            return $multiple;
-        },
-
-        /**
-         * Query for the files to be included
-         */
-        'query' => function (string $query = null) {
-            return $query;
-        },
-
-        /**
-         * Layout size for cards
-         */
-        'size' => function (string $size = null) {
-            return $size;
-        },
-
-        /**
-         * Main text
-         */
-        'text' => function (string $text = '{{ file.filename }}') {
-            return $text;
         },
 
         'value' => function ($value = null) {
@@ -118,40 +55,18 @@ return [
     ],
     'methods' => [
         'fileResponse' => function ($file) {
-            if ($this->layout === 'list') {
-                $thumb = [
-                    'width'  => 100,
-                    'height' => 100
-                ];
-            } else {
-                $thumb = [
-                    'width'  => 400,
-                    'height' => 400
-                ];
-            }
-
-            $image = $file->panelImage($this->image, $thumb);
-            $model = $this->model();
-            $uuid  = $file->parent() === $model ? $file->filename() : $file->id();
-
-            return [
-                'filename' => $file->filename(),
-                'text'     => $file->toString($this->text),
-                'link'     => $file->panelUrl(true),
-                'id'       => $file->id(),
-                'uuid'     => $uuid,
-                'url'      => $file->url(),
-                'info'     => $file->toString($this->info ?? false),
-                'image'    => $image,
-                'icon'     => $file->panelIcon($image),
-                'type'     => $file->type(),
-            ];
+            return $file->panel()->pickerData([
+                'image'  => $this->image,
+                'info'   => $this->info ?? false,
+                'layout' => $this->layout,
+                'model'  => $this->model(),
+                'text'   => $this->text,
+            ]);
         },
         'toFiles' => function ($value = null) {
             $files = [];
-            $kirby = kirby();
 
-            foreach (Yaml::decode($value) as $id) {
+            foreach (Data::decode($value, 'yaml') as $id) {
                 if (is_array($id) === true) {
                     $id = $id['id'] ?? null;
                 }
@@ -168,16 +83,40 @@ return [
         return [
             [
                 'pattern' => '/',
-                'action' => function () {
+                'action'  => function () {
                     $field = $this->field();
-                    $files = $field->model()->query($field->query(), 'Kirby\Cms\Files');
-                    $data  = [];
 
-                    foreach ($files as $index => $file) {
-                        $data[] = $field->fileResponse($file);
-                    }
+                    return $field->filepicker([
+                        'image'  => $field->image(),
+                        'info'   => $field->info(),
+                        'layout' => $field->layout(),
+                        'limit'  => $field->limit(),
+                        'page'   => $this->requestQuery('page'),
+                        'query'  => $field->query(),
+                        'search' => $this->requestQuery('search'),
+                        'text'   => $field->text()
+                    ]);
+                }
+            ],
+            [
+                'pattern' => 'upload',
+                'method'  => 'POST',
+                'action'  => function () {
+                    $field   = $this->field();
+                    $uploads = $field->uploads();
 
-                    return $data;
+                    // move_uploaded_file() not working with unit test
+                    // @codeCoverageIgnoreStart
+                    return $field->upload($this, $uploads, function ($file, $parent) use ($field) {
+                        return $file->panel()->pickerData([
+                            'image'  => $field->image(),
+                            'info'   => $field->info(),
+                            'layout' => $field->layout(),
+                            'model'  => $field->model(),
+                            'text'   => $field->text(),
+                        ]);
+                    });
+                    // @codeCoverageIgnoreEnd
                 }
             ]
         ];

@@ -13,10 +13,12 @@
   <?=js("assets/js/jquery.min.js")?>
   <?=js("assets/js/paper-full.min.js")?>
   <?=js("assets/js/main.js")?>
+  <?=js("assets/js/jquery.colorbox-min.js")?>
   <?php if ($page->isHomePage()): ?>
     <?=js("assets/js/home.js")?>
     <?=js("assets/js/bubbles.js", ['type' => "text/paperscript", 'canvas' => "bubbles"])?>
   <?php endif;?>
+
 
 
 </head>
@@ -34,7 +36,7 @@
           </div>
           <div>
           <?php
-$projects = page('projects')->children()->visible()->count();
+$projects = page('projects')->children()->listed()->count();
 ?>
             <p><?php echo "<span class='js-project-count'>" . $projects . '</span>/' . $projects ?></p>
             <a class="js-go-to-projects" href="<?=url()?>/#projects">projects</a>

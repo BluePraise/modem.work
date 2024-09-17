@@ -5,9 +5,21 @@ namespace Kirby\Cms;
 /**
  * Extension of the basic blueprint class
  * to handle all blueprints for users.
+ *
+ * @package   Kirby Cms
+ * @author    Bastian Allgeier <bastian@getkirby.com>
+ * @link      https://getkirby.com
+ * @copyright Bastian Allgeier
+ * @license   https://getkirby.com/license
  */
 class UserBlueprint extends Blueprint
 {
+    /**
+     * UserBlueprint constructor.
+     *
+     * @param array $props
+     * @throws \Kirby\Exception\InvalidArgumentException
+     */
     public function __construct(array $props)
     {
         // normalize and translate the description
@@ -18,7 +30,7 @@ class UserBlueprint extends Blueprint
 
         // normalize all available page options
         $this->props['options'] = $this->normalizeOptions(
-            $props['options'] ?? true,
+            $this->props['options'] ?? true,
             // defaults
             [
                 'create'         => null,

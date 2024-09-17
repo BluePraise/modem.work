@@ -3,20 +3,25 @@
 namespace Kirby\Cms;
 
 use Exception;
+use Kirby\Data\Data;
 use Kirby\Exception\InvalidArgumentException;
 use Kirby\Exception\NotFoundException;
-use Kirby\Data\Data;
+use Kirby\Filesystem\F;
 use Kirby\Form\Field;
 use Kirby\Toolkit\A;
-use Kirby\Toolkit\F;
 use Kirby\Toolkit\I18n;
-use Kirby\Toolkit\Obj;
 use Throwable;
 
 /**
  * The Blueprint class normalizes an array from a
  * blueprint file and converts sections, columns, fields
  * etc. into a correct tab layout.
+ *
+ * @package   Kirby Cms
+ * @author    Bastian Allgeier <bastian@getkirby.com>
+ * @link      https://getkirby.com
+ * @copyright Bastian Allgeier
+ * @license   https://getkirby.com/license
  */
 class Blueprint
 {
@@ -33,7 +38,7 @@ class Blueprint
      * Magic getter/caller for any blueprint prop
      *
      * @param string $key
-     * @param array $arguments
+     * @param array|null $arguments
      * @return mixed
      */
     public function __call(string $key, array $arguments = null)
@@ -45,11 +50,16 @@ class Blueprint
      * Creates a new blueprint object with the given props
      *
      * @param array $props
+     * @throws \Kirby\Exception\InvalidArgumentException If the blueprint model is missing
      */
     public function __construct(array $props)
     {
         if (empty($props['model']) === true) {
             throw new InvalidArgumentException('A blueprint model is required');
+        }
+
+        if (is_a($props['model'], ModelWithContent::class) === false) {
+            throw new InvalidArgumentException('Invalid blueprint model');
         }
 
         $this->model = $props['model'];
@@ -64,7 +74,7 @@ class Blueprint
         $props = $this->preset($props);
 
         // normalize the name
-        $props['name'] = $props['name'] ?? 'default';
+        $props['name'] ??= 'default';
 
         // normalize and translate the title
         $props['title'] = $this->i18n($props['title'] ?? ucfirst($props['name']));
@@ -81,13 +91,13 @@ class Blueprint
     }
 
     /**
-     * Improved var_dump output
+     * Improved `var_dump` output
      *
      * @return array
      */
-    public function __debuginfo(): array
+    public function __debugInfo(): array
     {
-        return $this->props;
+        return $this->props ?? [];
     }
 
     /**
@@ -193,22 +203,19 @@ class Blueprint
             return $props;
         }
 
-        $mixin = static::find($extends);
-
-        if ($mixin === null) {
-            $props = $props;
-        } elseif (is_array($mixin) === true) {
-            $props = A::merge($mixin, $props, A::MERGE_REPLACE);
-        } else {
+        foreach (A::wrap($extends) as $extend) {
             try {
-                $props = A::merge(Data::read($mixin), $props, A::MERGE_REPLACE);
+                $mixin = static::find($extend);
+                $mixin = static::extend($mixin);
+                $props = A::merge($mixin, $props, A::MERGE_REPLACE);
             } catch (Exception $e) {
-                $props = $props;
+                // keep the props unextended if the snippet wasn't found
             }
         }
 
         // remove the extends flag
         unset($props['extends']);
+
         return $props;
     }
 
@@ -216,9 +223,9 @@ class Blueprint
      * Create a new blueprint for a model
      *
      * @param string $name
-     * @param string $fallback
-     * @param Model $model
-     * @return self
+     * @param string|null $fallback
+     * @param \Kirby\Cms\Model $model
+     * @return static|null
      */
     public static function factory(string $name, string $fallback = null, Model $model)
     {
@@ -263,22 +270,38 @@ class Blueprint
      * Find a blueprint by name
      *
      * @param string $name
-     * @return string|array
+     * @return array
+     * @throws \Kirby\Exception\NotFoundException If the blueprint cannot be found
      */
-    public static function find(string $name)
+    public static function find(string $name): array
     {
+        if (isset(static::$loaded[$name]) === true) {
+            return static::$loaded[$name];
+        }
+
         $kirby = App::instance();
         $root  = $kirby->root('blueprints');
         $file  = $root . '/' . $name . '.yml';
 
-        if (F::exists($file, $root) === true) {
-            return $file;
+        // first try to find a site blueprint,
+        // then check in the plugin extensions
+        if (F::exists($file, $root) !== true) {
+            $file = $kirby->extension('blueprints', $name);
         }
 
-        if ($blueprint = $kirby->extension('blueprints', $name)) {
-            return $blueprint;
+        // callback option can be return array or blueprint file path
+        if (is_callable($file) === true) {
+            $file = $file($kirby);
         }
 
+        // now ensure that we always return the data array
+        if (is_string($file) === true && F::exists($file) === true) {
+            return static::$loaded[$name] = Data::read($file);
+        } elseif (is_array($file) === true) {
+            return static::$loaded[$name] = $file;
+        }
+
+        // neither a valid file nor array data
         throw new NotFoundException([
             'key'  => 'blueprint.notFound',
             'data' => ['name' => $name]
@@ -311,21 +334,15 @@ class Blueprint
      * Loads a blueprint from file or array
      *
      * @param string $name
-     * @param string $fallback
-     * @param Model $model
      * @return array
      */
-    public static function load(string $name)
+    public static function load(string $name): array
     {
-        if (isset(static::$loaded[$name]) === true) {
-            return static::$loaded[$name];
-        }
+        $props = static::find($name);
 
-        $props     = static::find($name);
         $normalize = function ($props) use ($name) {
-
             // inject the filename as name if no name is set
-            $props['name'] = $props['name'] ?? $name;
+            $props['name'] ??= $name;
 
             // normalize the title
             $title = $props['title'] ?? ucfirst($props['name']);
@@ -336,20 +353,13 @@ class Blueprint
             return $props;
         };
 
-        if (is_array($props) === true) {
-            return $normalize($props);
-        }
-
-        $file  = $props;
-        $props = Data::read($file);
-
-        return static::$loaded[$name] = $normalize($props);
+        return $normalize($props);
     }
 
     /**
      * Returns the parent model
      *
-     * @return Model
+     * @return \Kirby\Cms\Model
      */
     public function model()
     {
@@ -376,7 +386,9 @@ class Blueprint
     protected function normalizeColumns(string $tabName, array $columns): array
     {
         foreach ($columns as $columnKey => $columnProps) {
+            // unset/remove column if its property is not array
             if (is_array($columnProps) === false) {
+                unset($columns[$columnKey]);
                 continue;
             }
 
@@ -402,7 +414,11 @@ class Blueprint
         return $columns;
     }
 
-    public static function helpList(array $items)
+    /**
+     * @param array $items
+     * @return string
+     */
+    public static function helpList(array $items): string
     {
         $md = [];
 
@@ -418,6 +434,7 @@ class Blueprint
      *
      * @param array|string $props
      * @return array
+     * @throws \Kirby\Exception\InvalidArgumentException If the filed name is missing or the field type is invalid
      */
     public static function fieldProps($props): array
     {
@@ -469,7 +486,7 @@ class Blueprint
         return [
             'label' => 'Error',
             'name'  => $name,
-            'text'  => $message,
+            'text'  => strip_tags($message),
             'theme' => 'negative',
             'type'  => 'info',
         ];
@@ -501,6 +518,12 @@ class Blueprint
             // use the name as type definition
             if ($fieldProps === true) {
                 $fieldProps = [];
+            }
+
+            // unset / remove field if its property is false
+            if ($fieldProps === false) {
+                unset($fields[$fieldName]);
+                continue;
             }
 
             // inject the name
@@ -549,9 +572,7 @@ class Blueprint
 
         // set all options to false
         if ($options === false) {
-            return array_map(function () {
-                return false;
-            }, $defaults);
+            return array_map(fn () => false, $defaults);
         }
 
         // extend options if possible
@@ -561,7 +582,7 @@ class Blueprint
             $alias = $aliases[$key] ?? null;
 
             if ($alias !== null) {
-                $options[$alias] = $options[$alias] ?? $value;
+                $options[$alias] ??= $value;
                 unset($options[$key]);
             }
         }
@@ -580,15 +601,33 @@ class Blueprint
     {
         foreach ($sections as $sectionName => $sectionProps) {
 
+            // unset / remove section if its property is false
+            if ($sectionProps === false) {
+                unset($sections[$sectionName]);
+                continue;
+            }
+
+            // fallback to default props when true is passed
+            if ($sectionProps === true) {
+                $sectionProps = [];
+            }
+
             // inject all section extensions
             $sectionProps = $this->extend($sectionProps);
 
             $sections[$sectionName] = $sectionProps = array_merge($sectionProps, [
                 'name' => $sectionName,
-                'type' => $type = $sectionProps['type'] ?? null
+                'type' => $type = $sectionProps['type'] ?? $sectionName
             ]);
 
-            if (isset(Section::$types[$type]) === false) {
+            if (empty($type) === true || is_string($type) === false) {
+                $sections[$sectionName] = [
+                    'name' => $sectionName,
+                    'headline' => 'Invalid section type for section "' . $sectionName . '"',
+                    'type' => 'info',
+                    'text' => 'The following section types are available: ' . $this->helpList(array_keys(Section::$types))
+                ];
+            } elseif (isset(Section::$types[$type]) === false) {
                 $sections[$sectionName] = [
                     'name' => $sectionName,
                     'headline' => 'Invalid section type ("' . $type . '")',
@@ -648,6 +687,12 @@ class Blueprint
 
         foreach ($tabs as $tabName => $tabProps) {
 
+            // unset / remove tab if its property is false
+            if ($tabProps === false) {
+                unset($tabs[$tabName]);
+                continue;
+            }
+
             // inject all tab extensions
             $tabProps = $this->extend($tabProps);
 
@@ -661,6 +706,7 @@ class Blueprint
                 'columns' => $this->normalizeColumns($tabName, $tabProps['columns'] ?? []),
                 'icon'    => $tabProps['icon']  ?? null,
                 'label'   => $this->i18n($tabProps['label'] ?? ucfirst($tabName)),
+                'link'    => $this->model->panel()->url(true) . '/?tab=' . $tabName,
                 'name'    => $tabName,
             ]);
         }
@@ -684,16 +730,22 @@ class Blueprint
             return $props;
         }
 
-        return static::$presets[$props['preset']]($props);
+        $preset = static::$presets[$props['preset']];
+
+        if (is_string($preset) === true) {
+            $preset = require $preset;
+        }
+
+        return $preset($props);
     }
 
     /**
      * Returns a single section by name
      *
      * @param string $name
-     * @return Section|null
+     * @return \Kirby\Cms\Section|null
      */
-    public function section(string $name): ?Section
+    public function section(string $name)
     {
         if (empty($this->sections[$name]) === true) {
             return null;
@@ -716,19 +768,24 @@ class Blueprint
      */
     public function sections(): array
     {
-        return array_map(function ($section) {
-            return $this->section($section['name']);
-        }, $this->sections);
+        return A::map(
+            $this->sections,
+            fn ($section) => $this->section($section['name'])
+        );
     }
 
     /**
      * Returns a single tab by name
      *
-     * @param string $name
+     * @param string|null $name
      * @return array|null
      */
-    public function tab(string $name): ?array
+    public function tab(?string $name = null): ?array
     {
+        if ($name === null) {
+            return A::first($this->tabs);
+        }
+
         return $this->tabs[$name] ?? null;
     }
 

@@ -2,7 +2,7 @@
 
 namespace Kirby\Toolkit;
 
-use Zend\Escaper\Escaper;
+use Laminas\Escaper\Escaper;
 
 /**
  * The `Escape` class provides methods
@@ -12,12 +12,23 @@ use Zend\Escaper\Escaper;
  * attribute values like width, name,
  * value, etc.
  *
- * Wrapper for the Zend Escaper
+ * Wrapper for the Laminas Escaper
+ * @link https://github.com/laminas/laminas-escaper
  *
- * @link https://github.com/zendframework/zend-escaper
+ * @package   Kirby Toolkit
+ * @author    Bastian Allgeier <bastian@getkirby.com>
+ * @link      https://getkirby.com
+ * @copyright Bastian Allgeier
+ * @license   https://opensource.org/licenses/MIT
  */
 class Escape
 {
+    /**
+     * The internal singleton escaper instance
+     *
+     * @var \Laminas\Escaper\Escaper
+     */
+    protected static $escaper;
 
     /**
      * Escape common HTML attributes data
@@ -34,12 +45,12 @@ class Escape
      * <div attr='...ESCAPE UNTRUSTED DATA BEFORE PUTTING HERE...'>content</div>
      * <div attr="...ESCAPE UNTRUSTED DATA BEFORE PUTTING HERE...">content</div>
      *
-     * @param  string $string
+     * @param string $string
      * @return string
      */
     public static function attr($string)
     {
-        return (new Escaper('utf-8'))->escapeHtmlAttr($string);
+        return static::escaper()->escapeHtmlAttr($string);
     }
 
     /**
@@ -55,12 +66,22 @@ class Escape
      * <style>selector { property : "...ESCAPE UNTRUSTED DATA BEFORE PUTTING HERE..."; } </style>
      * <span style="property : ...ESCAPE UNTRUSTED DATA BEFORE PUTTING HERE...">text</span>
      *
-     * @param  string $string
+     * @param string $string
      * @return string
      */
     public static function css($string)
     {
-        return (new Escaper('utf-8'))->escapeCss($string);
+        return static::escaper()->escapeCss($string);
+    }
+
+    /**
+     * Get the escaper instance (and create if needed)
+     *
+     * @return \Laminas\Escaper\Escaper
+     */
+    protected static function escaper()
+    {
+        return static::$escaper ??= new Escaper('utf-8');
     }
 
     /**
@@ -75,12 +96,12 @@ class Escape
      * <body>...ESCAPE UNTRUSTED DATA BEFORE PUTTING HERE...</body>
      * <div>...ESCAPE UNTRUSTED DATA BEFORE PUTTING HERE...</div>
      *
-     * @param  string $string
+     * @param string $string
      * @return string
      */
     public static function html($string)
     {
-        return (new Escaper('utf-8'))->escapeHtml($string);
+        return static::escaper()->escapeHtml($string);
     }
 
     /**
@@ -93,12 +114,12 @@ class Escape
      * <script>x='...ESCAPE UNTRUSTED DATA BEFORE PUTTING HERE...'</script>
      * <div onmouseover="x='...ESCAPE UNTRUSTED DATA BEFORE PUTTING HERE...'"</div>
      *
-     * @param  string $string
+     * @param string $string
      * @return string
      */
     public static function js($string)
     {
-        return (new Escaper('utf-8'))->escapeJs($string);
+        return static::escaper()->escapeJs($string);
     }
 
     /**
@@ -109,7 +130,7 @@ class Escape
      *
      * <a href="http://www.somesite.com?test=...ESCAPE UNTRUSTED DATA BEFORE PUTTING HERE...">link</a>
      *
-     * @param string  $string
+     * @param string $string
      * @return string
      */
     public static function url($string)
@@ -131,7 +152,7 @@ class Escape
      * < is replaced with &lt;
      * > is replaced with &gt;
      *
-     * @param  string $string
+     * @param string $string
      * @return string
      */
     public static function xml($string)

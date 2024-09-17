@@ -2,16 +2,17 @@
 
 namespace Kirby\Cms;
 
-use Throwable;
 use Kirby\Data\Json;
 use Kirby\Exception\Exception;
+use Kirby\Exception\InvalidArgumentException;
 use Kirby\Exception\PermissionException;
+use Kirby\Filesystem\Dir;
+use Kirby\Filesystem\F;
 use Kirby\Http\Remote;
-use Kirby\Http\Uri;
-use Kirby\Http\Url;
-use Kirby\Toolkit\Dir;
-use Kirby\Toolkit\F;
+use Kirby\Toolkit\A;
 use Kirby\Toolkit\Str;
+use Kirby\Toolkit\V;
+use Throwable;
 
 /**
  * The System class gathers all information
@@ -20,17 +21,22 @@ use Kirby\Toolkit\Str;
  *
  * This is mostly used by the panel installer
  * to check if the panel can be installed at all.
+ *
+ * @package   Kirby Cms
+ * @author    Bastian Allgeier <bastian@getkirby.com>
+ * @link      https://getkirby.com
+ * @copyright Bastian Allgeier
+ * @license   https://getkirby.com/license
  */
 class System
 {
-
     /**
-     * @var App
+     * @var \Kirby\Cms\App
      */
     protected $app;
 
     /**
-     * @param App $app
+     * @param \Kirby\Cms\App $app
      */
     public function __construct(App $app)
     {
@@ -41,38 +47,19 @@ class System
     }
 
     /**
-     * Improved var_dump output
+     * Improved `var_dump` output
      *
      * @return array
      */
-    public function __debuginfo(): array
+    public function __debugInfo(): array
     {
         return $this->toArray();
     }
 
     /**
-     * Get an status array of all checks
-     *
-     * @return array
-     */
-    public function status(): array
-    {
-        return [
-            'accounts'  => $this->accounts(),
-            'content'   => $this->content(),
-            'curl'      => $this->curl(),
-            'sessions'  => $this->sessions(),
-            'mbstring'  => $this->mbstring(),
-            'media'     => $this->media(),
-            'php'       => $this->php(),
-            'server'    => $this->server(),
-        ];
-    }
-
-    /**
      * Check for a writable accounts folder
      *
-     * @return boolean
+     * @return bool
      */
     public function accounts(): bool
     {
@@ -82,7 +69,7 @@ class System
     /**
      * Check for a writable content folder
      *
-     * @return boolean
+     * @return bool
      */
     public function content(): bool
     {
@@ -92,7 +79,7 @@ class System
     /**
      * Check for an existing curl extension
      *
-     * @return boolean
+     * @return bool
      */
     public function curl(): bool
     {
@@ -100,27 +87,134 @@ class System
     }
 
     /**
+     * Returns the URL to the file within a system folder
+     * if the file is located in the document
+     * root. Otherwise it will return null.
+     *
+     * @param string $folder 'git', 'content', 'site', 'kirby'
+     * @return string|null
+     */
+    public function exposedFileUrl(string $folder): ?string
+    {
+        if (!$url = $this->folderUrl($folder)) {
+            return null;
+        }
+
+        switch ($folder) {
+            case 'content':
+                return $url . '/' . basename($this->app->site()->contentFile());
+            case 'git':
+                return $url . '/config';
+            case 'kirby':
+                return $url . '/composer.json';
+            case 'site':
+                $root  = $this->app->root('site');
+                $files = glob($root . '/blueprints/*.yml');
+
+                if (empty($files) === true) {
+                    $files = glob($root . '/templates/*.*');
+                }
+
+                if (empty($files) === true) {
+                    $files = glob($root . '/snippets/*.*');
+                }
+
+                if (empty($files) === true || empty($files[0]) === true) {
+                    return $url;
+                }
+
+                $file = $files[0];
+                $file = basename(dirname($file)) . '/' . basename($file);
+
+                return $url . '/' . $file;
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * Returns the URL to a system folder
+     * if the folder is located in the document
+     * root. Otherwise it will return null.
+     *
+     * @param string $folder 'git', 'content', 'site', 'kirby'
+     * @return string|null
+     */
+    public function folderUrl(string $folder): ?string
+    {
+        $index = $this->app->root('index');
+
+        if ($folder === 'git') {
+            $root = $index . '/.git';
+        } else {
+            $root = $this->app->root($folder);
+        }
+
+        if ($root === null || is_dir($root) === false || is_dir($index) === false) {
+            return null;
+        }
+
+        $root  = realpath($root);
+        $index = realpath($index);
+
+        // windows
+        $root  = str_replace('\\', '/', $root);
+        $index = str_replace('\\', '/', $index);
+
+        // the folder is not within the document root?
+        if (Str::startsWith($root, $index) === false) {
+            return null;
+        }
+
+        // get the path after the document root
+        $path = trim(Str::after($root, $index), '/');
+
+        // build the absolute URL to the folder
+        return Url::to($path);
+    }
+
+    /**
+     * Returns the app's human-readable
+     * index URL without scheme
+     *
+     * @return string
+     */
+    public function indexUrl(): string
+    {
+        return $this->app->url('index', true)->setScheme(null)->setSlash(false)->toString();
+    }
+
+    /**
      * Create the most important folders
      * if they don't exist yet
      *
      * @return void
+     * @throws \Kirby\Exception\PermissionException
      */
     public function init()
     {
-        /* /site/accounts */
+        // init /site/accounts
         try {
             Dir::make($this->app->root('accounts'));
         } catch (Throwable $e) {
             throw new PermissionException('The accounts directory could not be created');
         }
 
-        /* /content */
+        // init /site/sessions
+        try {
+            Dir::make($this->app->root('sessions'));
+        } catch (Throwable $e) {
+            throw new PermissionException('The sessions directory could not be created');
+        }
+
+        // init /content
         try {
             Dir::make($this->app->root('content'));
         } catch (Throwable $e) {
             throw new PermissionException('The content directory could not be created');
         }
 
+        // init /media
         try {
             Dir::make($this->app->root('media'));
         } catch (Throwable $e) {
@@ -134,7 +228,7 @@ class System
      * option must be explicitly set to true
      * to get the installer up and running.
      *
-     * @return boolean
+     * @return bool
      */
     public function isInstallable(): bool
     {
@@ -144,7 +238,7 @@ class System
     /**
      * Check if Kirby is already installed
      *
-     * @return boolean
+     * @return bool
      */
     public function isInstalled(): bool
     {
@@ -154,40 +248,17 @@ class System
     /**
      * Check if this is a local installation
      *
-     * @return boolean
+     * @return bool
      */
     public function isLocal(): bool
     {
-        $server = $this->app->server();
-        $host   = $server->host();
-
-        if ($host === 'localhost') {
-            return true;
-        }
-
-        if (in_array($server->address(), ['::1', '127.0.0.1', '0.0.0.0']) === true) {
-            return true;
-        }
-
-        if (Str::endsWith($host, '.dev') === true) {
-            return true;
-        }
-
-        if (Str::endsWith($host, '.local') === true) {
-            return true;
-        }
-
-        if (Str::endsWith($host, '.test') === true) {
-            return true;
-        }
-
-        return false;
+        return $this->app->environment()->isLocal();
     }
 
     /**
      * Check if all tests pass
      *
-     * @return boolean
+     * @return bool
      */
     public function isOk(): bool
     {
@@ -195,76 +266,17 @@ class System
     }
 
     /**
-     * Returns the app's index URL for
-     * licensing purposes without scheme
-     *
-     * @return string
-     */
-    protected function licenseUrl(): string
-    {
-        $url = $this->app->url('index');
-
-        if (Url::isAbsolute($url)) {
-            $uri = Url::toObject($url);
-        } else {
-            // index URL was configured without host, use the current host
-            $uri = Uri::current([
-                'path'   => $url,
-                'query'  => null
-            ]);
-        }
-
-        return $uri->setScheme(null)->setSlash(false)->toString();
-    }
-
-    /**
-     * Normalizes the app's index URL for
-     * licensing purposes
-     *
-     * @param string|null $url Input URL, by default the app's index URL
-     * @return string Normalized URL
-     */
-    protected function licenseUrlNormalized(string $url = null): string
-    {
-        if ($url === null) {
-            $url = $this->licenseUrl();
-        }
-
-        // remove common "testing" subdomains as well as www.
-        // to ensure that installations of the same site have
-        // the same license URL; only for installations at /,
-        // subdirectory installations are difficult to normalize
-        if (Str::contains($url, '/') === false) {
-            if (Str::startsWith($url, 'www.')) {
-                return substr($url, 4);
-            }
-
-            if (Str::startsWith($url, 'dev.')) {
-                return substr($url, 4);
-            }
-
-            if (Str::startsWith($url, 'test.')) {
-                return substr($url, 5);
-            }
-
-            if (Str::startsWith($url, 'staging.')) {
-                return substr($url, 8);
-            }
-        }
-
-        return $url;
-    }
-
-    /**
      * Loads the license file and returns
      * the license information if available
      *
-     * @return string|false
+     * @return string|bool License key or `false` if the current user has
+     *                     permissions for access.settings, otherwise just a
+     *                     boolean that tells whether a valid license is active
      */
     public function license()
     {
         try {
-            $license = Json::read($this->app->root('config') . '/.license');
+            $license = Json::read($this->app->root('license'));
         } catch (Throwable $e) {
             return false;
         }
@@ -300,17 +312,124 @@ class System
         }
 
         // verify the URL
-        if ($this->licenseUrlNormalized() !== $this->licenseUrlNormalized($license['domain'])) {
+        if ($this->licenseUrl() !== $this->licenseUrl($license['domain'])) {
             return false;
         }
 
-        return $license['license'];
+        // only return the actual license key if the
+        // current user has appropriate permissions
+        $user = $this->app->user();
+        if ($user && $user->isAdmin() === true) {
+            return $license['license'];
+        } else {
+            return true;
+        }
+    }
+
+    /**
+     * Normalizes the app's index URL for
+     * licensing purposes
+     *
+     * @param string|null $url Input URL, by default the app's index URL
+     * @return string Normalized URL
+     */
+    protected function licenseUrl(string $url = null): string
+    {
+        if ($url === null) {
+            $url = $this->indexUrl();
+        }
+
+        // remove common "testing" subdomains as well as www.
+        // to ensure that installations of the same site have
+        // the same license URL; only for installations at /,
+        // subdirectory installations are difficult to normalize
+        if (Str::contains($url, '/') === false) {
+            if (Str::startsWith($url, 'www.')) {
+                return substr($url, 4);
+            }
+
+            if (Str::startsWith($url, 'dev.')) {
+                return substr($url, 4);
+            }
+
+            if (Str::startsWith($url, 'test.')) {
+                return substr($url, 5);
+            }
+
+            if (Str::startsWith($url, 'staging.')) {
+                return substr($url, 8);
+            }
+        }
+
+        return $url;
+    }
+
+    /**
+     * Returns the configured UI modes for the login form
+     * with their respective options
+     *
+     * @return array
+     *
+     * @throws \Kirby\Exception\InvalidArgumentException If the configuration is invalid
+     *                                                   (only in debug mode)
+     */
+    public function loginMethods(): array
+    {
+        $default = ['password' => []];
+        $methods = A::wrap($this->app->option('auth.methods', $default));
+
+        // normalize the syntax variants
+        $normalized = [];
+        $uses2fa = false;
+        foreach ($methods as $key => $value) {
+            if (is_int($key) === true) {
+                // ['password']
+                $normalized[$value] = [];
+            } elseif ($value === true) {
+                // ['password' => true]
+                $normalized[$key] = [];
+            } else {
+                // ['password' => [...]]
+                $normalized[$key] = $value;
+
+                if (isset($value['2fa']) === true && $value['2fa'] === true) {
+                    $uses2fa = true;
+                }
+            }
+        }
+
+        // 2FA must not be circumvented by code-based modes
+        foreach (['code', 'password-reset'] as $method) {
+            if ($uses2fa === true && isset($normalized[$method]) === true) {
+                unset($normalized[$method]);
+
+                if ($this->app->option('debug') === true) {
+                    $message = 'The "' . $method . '" login method cannot be enabled when 2FA is required';
+                    throw new InvalidArgumentException($message);
+                }
+            }
+        }
+
+        // only one code-based mode can be active at once
+        if (
+            isset($normalized['code']) === true &&
+            isset($normalized['password-reset']) === true
+        ) {
+            unset($normalized['code']);
+
+            if ($this->app->option('debug') === true) {
+                $message = 'The "code" and "password-reset" login methods cannot be enabled together';
+                throw new InvalidArgumentException($message);
+            }
+        }
+
+        return $normalized;
     }
 
     /**
      * Check for an existing mbstring extension
      *
-     * @return boolean
+     * @return bool
      */
     public function mbString(): bool
     {
@@ -320,7 +439,7 @@ class System
     /**
      * Check for a writable media folder
      *
-     * @return boolean
+     * @return bool
      */
     public function media(): bool
     {
@@ -330,11 +449,24 @@ class System
     /**
      * Check for a valid PHP version
      *
-     * @return boolean
+     * @return bool
      */
     public function php(): bool
     {
-        return version_compare(phpversion(), '7.1.0', '>=');
+        return
+            version_compare(PHP_VERSION, '7.4.0', '>=') === true &&
+            version_compare(PHP_VERSION, '8.2.0', '<')  === true;
+    }
+
+    /**
+     * Returns a sorted collection of all
+     * installed plugins
+     *
+     * @return \Kirby\Cms\Collection
+     */
+    public function plugins()
+    {
+        return (new Collection(App::instance()->plugins()))->sortBy('name', 'asc');
     }
 
     /**
@@ -342,17 +474,32 @@ class System
      * and adds it to the .license file in the config
      * folder if possible.
      *
-     * @param string $license
-     * @param string $email
-     * @return boolean
+     * @param string|null $license
+     * @param string|null $email
+     * @return bool
+     * @throws \Kirby\Exception\Exception
+     * @throws \Kirby\Exception\InvalidArgumentException
      */
-    public function register(string $license, string $email): bool
+    public function register(string $license = null, string $email = null): bool
     {
-        $response = Remote::get('https://licenses.getkirby.com/register', [
+        if (Str::startsWith($license, 'K3-PRO-') === false) {
+            throw new InvalidArgumentException([
+                'key' => 'license.format'
+            ]);
+        }
+
+        if (V::email($email) === false) {
+            throw new InvalidArgumentException([
+                'key' => 'license.email'
+            ]);
+        }
+
+        // @codeCoverageIgnoreStart
+        $response = Remote::get('https://hub.getkirby.com/register', [
             'data' => [
                 'license' => $license,
-                'email'   => $email,
-                'domain'  => $this->licenseUrl()
+                'email'   => Str::lower(trim($email)),
+                'domain'  => $this->indexUrl()
             ]
         ]);
 
@@ -367,14 +514,17 @@ class System
         $json['email'] = $email;
 
         // where to store the license file
-        $file = $this->app->root('config') . '/.license';
+        $file = $this->app->root('license');
 
         // save the license information
         Json::write($file, $json);
 
         if ($this->license() === false) {
-            throw new Exception('The license could not be verified');
+            throw new InvalidArgumentException([
+                'key' => 'license.verification'
+            ]);
         }
+        // @codeCoverageIgnoreEnd
 
         return true;
     }
@@ -382,27 +532,43 @@ class System
     /**
      * Check for a valid server environment
      *
-     * @return boolean
+     * @return bool
      */
     public function server(): bool
     {
-        $servers = [
-            'apache',
-            'caddy',
-            'litespeed',
-            'nginx',
-            'php'
-        ];
+        return $this->serverSoftware() !== null;
+    }
 
-        $software = $_SERVER['SERVER_SOFTWARE'] ?? null;
+    /**
+     * Returns the detected server software
+     *
+     * @return string|null
+     */
+    public function serverSoftware(): ?string
+    {
+        if ($servers = $this->app->option('servers')) {
+            $servers = A::wrap($servers);
+        } else {
+            $servers = [
+                'apache',
+                'caddy',
+                'litespeed',
+                'nginx',
+                'php'
+            ];
+        }
 
-        return preg_match('!(' . implode('|', $servers) . ')!i', $software) > 0;
+        $software = $this->app->environment()->get('SERVER_SOFTWARE', '');
+
+        preg_match('!(' . implode('|', $servers) . ')!i', $software, $matches);
+
+        return $matches[0] ?? null;
     }
 
     /**
      * Check for a writable sessions folder
      *
-     * @return boolean
+     * @return bool
      */
     public function sessions(): bool
     {
@@ -410,8 +576,43 @@ class System
     }
 
     /**
-     * Return the status as array
+     * Get an status array of all checks
      *
+     * @return array
+     */
+    public function status(): array
+    {
+        return [
+            'accounts'  => $this->accounts(),
+            'content'   => $this->content(),
+            'curl'      => $this->curl(),
+            'sessions'  => $this->sessions(),
+            'mbstring'  => $this->mbstring(),
+            'media'     => $this->media(),
+            'php'       => $this->php(),
+            'server'    => $this->server(),
+        ];
+    }
+
+    /**
+     * Returns the site's title as defined in the
+     * content file or `site.yml` blueprint
+     * @since 3.6.0
+     *
+     * @return string
+     */
+    public function title(): string
+    {
+        $site = $this->app->site();
+
+        if ($site->title()->isNotEmpty()) {
+            return $site->title()->value();
+        }
+
+        return $site->blueprint()->title();
+    }
+
+    /**
      * @return array
      */
     public function toArray(): array

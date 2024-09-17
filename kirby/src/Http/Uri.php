@@ -2,19 +2,19 @@
 
 namespace Kirby\Http;
 
-use Throwable;
+use Kirby\Cms\App;
 use Kirby\Exception\InvalidArgumentException;
 use Kirby\Toolkit\Properties;
-use Kirby\Toolkit\Str;
+use Throwable;
 
 /**
  * Uri builder class
  *
  * @package   Kirby Http
  * @author    Bastian Allgeier <bastian@getkirby.com>
- * @link      http://getkirby.com
+ * @link      https://getkirby.com
  * @copyright Bastian Allgeier
- * @license   MIT
+ * @license   https://opensource.org/licenses/MIT
  */
 class Uri
 {
@@ -91,7 +91,7 @@ class Uri
     protected $scheme = 'http';
 
     /**
-     * @var boolean
+     * @var bool
      */
     protected $slash = false;
 
@@ -130,8 +130,8 @@ class Uri
     /**
      * Creates a new URI object
      *
-     * @param array $props
-     * @param array $inject
+     * @param array|string $props
+     * @param array $inject Additional props to inject if a URL string is passed
      */
     public function __construct($props = [], array $inject = [])
     {
@@ -145,10 +145,7 @@ class Uri
 
         // parse the path and extract params
         if (empty($props['path']) === false) {
-            $extract         = Params::extract($props['path']);
-            $props['params'] = $props['params'] ?? $extract['params'];
-            $props['path']   = $extract['path'];
-            $props['slash']  = $props['slash'] ?? $extract['slash'];
+            $props = static::parsePath($props);
         }
 
         $this->setProperties($this->props = $props);
@@ -197,7 +194,7 @@ class Uri
      *
      * @return string|null
      */
-    public function auth()
+    public function auth(): ?string
     {
         $auth = trim($this->username . ':' . $this->password);
         return $auth !== ':' ? $auth : null;
@@ -207,28 +204,15 @@ class Uri
      * Returns the base url (scheme + host)
      * without trailing slash
      *
-     * @return string
+     * @return string|null
      */
-    public function base()
+    public function base(): ?string
     {
-        if (empty($this->host) === true || $this->host === '/') {
-            return null;
+        if ($domain = $this->domain()) {
+            return $this->scheme ? $this->scheme . '://' . $domain : $domain;
         }
 
-        $auth = $this->auth();
-        $base = $this->scheme ? $this->scheme . '://' : '';
-
-        if ($auth !== null) {
-            $base .= $auth . '@';
-        }
-
-        $base .= $this->host;
-
-        if ($this->port !== null && in_array($this->port, [80, 443]) === false) {
-            $base .= ':' . $this->port;
-        }
-
-        return $base;
+        return null;
     }
 
     /**
@@ -236,9 +220,9 @@ class Uri
      * new props.
      *
      * @param array $props
-     * @return self
+     * @return static
      */
-    public function clone(array $props = []): self
+    public function clone(array $props = [])
     {
         $clone = clone $this;
 
@@ -251,30 +235,52 @@ class Uri
 
     /**
      * @param array $props
-     * @param boolean $forwarded
-     * @return self
+     * @return static
      */
-    public static function current(array $props = [], bool $forwarded = false): self
+    public static function current(array $props = [])
     {
         if (static::$current !== null) {
             return static::$current;
         }
 
-        $uri = parse_url('http://getkirby.com' . Server::get('REQUEST_URI'));
+        if ($app = App::instance(null, true)) {
+            $environment = $app->environment();
+        } else {
+            $environment = new Environment();
+        }
 
-        $url = new static(array_merge([
-            'scheme' => Server::https() === true ? 'https' : 'http',
-            'host'   => Server::host($forwarded),
-            'port'   => Server::port($forwarded),
-            'path'   => $uri['path'] ?? null,
-            'query'  => $uri['query'] ?? null,
-        ], $props));
-
-        return $url;
+        return new static($environment->requestUrl(), $props);
     }
 
     /**
-     * @return boolean
+     * Returns the domain without scheme, path or query
+     *
+     * @return string|null
+     */
+    public function domain(): ?string
+    {
+        if (empty($this->host) === true || $this->host === '/') {
+            return null;
+        }
+
+        $auth   = $this->auth();
+        $domain = '';
+
+        if ($auth !== null) {
+            $domain .= $auth . '@';
+        }
+
+        $domain .= $this->host;
+
+        if ($this->port !== null && in_array($this->port, [80, 443]) === false) {
+            $domain .= ':' . $this->port;
+        }
+
+        return $domain;
+    }
+
+    /**
+     * @return bool
      */
     public function hasFragment(): bool
     {
@@ -282,7 +288,7 @@ class Uri
     }
 
     /**
-     * @return boolean
+     * @return bool
      */
     public function hasPath(): bool
     {
@@ -290,7 +296,7 @@ class Uri
     }
 
     /**
-     * @return boolean
+     * @return bool
      */
     public function hasQuery(): bool
     {
@@ -298,12 +304,20 @@ class Uri
     }
 
     /**
+     * @return bool
+     */
+    public function https(): bool
+    {
+        return $this->scheme() === 'https';
+    }
+
+    /**
      * Tries to convert the internationalized host
      * name to the human-readable UTF8 representation
      *
-     * @return self
+     * @return $this
      */
-    public function idn(): self
+    public function idn()
     {
         if (empty($this->host) === false) {
             $this->setHost(Idn::decode($this->host));
@@ -316,36 +330,18 @@ class Uri
      * or any other executed script.
      *
      * @param array $props
-     * @param bool $forwarded
-     * @return string
+     * @return static
      */
-    public static function index(array $props = [], bool $forwarded = false): self
+    public static function index(array $props = [])
     {
-        if (Server::cli() === true) {
-            $path = null;
+        if ($app = App::instance(null, true)) {
+            $url = $app->url('index');
         } else {
-            $path = Server::get('SCRIPT_NAME');
-            // replace Windows backslashes
-            $path = str_replace('\\', '/', $path);
-            // remove the script
-            $path = dirname($path);
-            // replace those fucking backslashes again
-            $path = str_replace('\\', '/', $path);
-            // remove the leading and trailing slashes
-            $path = trim($path, '/');
+            $url = (new Environment())->baseUrl();
         }
 
-        if ($path === '.') {
-            $path = null;
-        }
-
-        return static::current(array_merge($props, [
-            'path'     => $path,
-            'query'    => null,
-            'fragment' => null,
-        ]), $forwarded);
+        return new static($url, $props);
     }
-
 
     /**
      * Checks if the host exists
@@ -358,8 +354,8 @@ class Uri
     }
 
     /**
-     * @param  string|null $fragment
-     * @return self
+     * @param string|null $fragment
+     * @return $this
      */
     public function setFragment(string $fragment = null)
     {
@@ -368,50 +364,56 @@ class Uri
     }
 
     /**
-     * @param  string $host
-     * @return self
+     * @param string $host
+     * @return $this
      */
-    public function setHost(string $host = null): self
+    public function setHost(string $host = null)
     {
         $this->host = $host;
         return $this;
     }
 
     /**
-     * @param  Params|string|array|null $path
-     * @return self
+     * @param \Kirby\Http\Params|string|array|false|null $params
+     * @return $this
      */
-    public function setParams($params = null): self
+    public function setParams($params = null)
     {
+        // ensure that the special constructor value of `false`
+        // is never passed through as it's not supported by `Params`
+        if ($params === false) {
+            $params = [];
+        }
+
         $this->params = is_a($params, 'Kirby\Http\Params') === true ? $params : new Params($params);
         return $this;
     }
 
     /**
-     * @param  string|null $password
-     * @return self
+     * @param string|null $password
+     * @return $this
      */
-    public function setPassword(string $password = null): self
+    public function setPassword(string $password = null)
     {
         $this->password = $password;
         return $this;
     }
 
     /**
-     * @param  Path|string|array|null $path
-     * @return self
+     * @param \Kirby\Http\Path|string|array|null $path
+     * @return $this
      */
-    public function setPath($path = null): self
+    public function setPath($path = null)
     {
         $this->path = is_a($path, 'Kirby\Http\Path') === true ? $path : new Path($path);
         return $this;
     }
 
     /**
-     * @param  int|null $port
-     * @return self
+     * @param int|null $port
+     * @return $this
      */
-    public function setPort(int $port = null): self
+    public function setPort(int $port = null)
     {
         if ($port === 0) {
             $port = null;
@@ -428,20 +430,20 @@ class Uri
     }
 
     /**
-     * @param  string|array|null $query
-     * @return self
+     * @param \Kirby\Http\Query|string|array|null $query
+     * @return $this
      */
-    public function setQuery($query = null): self
+    public function setQuery($query = null)
     {
         $this->query = is_a($query, 'Kirby\Http\Query') === true ? $query : new Query($query);
         return $this;
     }
 
     /**
-     * @param  string $scheme
-     * @return self
+     * @param string $scheme
+     * @return $this
      */
-    public function setScheme(string $scheme = null): self
+    public function setScheme(string $scheme = null)
     {
         if ($scheme !== null && in_array($scheme, ['http', 'https', 'ftp']) === false) {
             throw new InvalidArgumentException('Invalid URL scheme: ' . $scheme);
@@ -456,19 +458,19 @@ class Uri
      * the path when the URI is being built
      *
      * @param bool $slash
-     * @return self
+     * @return $this
      */
-    public function setSlash(bool $slash = false): self
+    public function setSlash(bool $slash = false)
     {
         $this->slash = $slash;
         return $this;
     }
 
     /**
-     * @param  string|null $username
-     * @return self
+     * @param string|null $username
+     * @return $this
      */
-    public function setUsername(string $username = null): self
+    public function setUsername(string $username = null)
     {
         $this->username = $username;
         return $this;
@@ -536,13 +538,42 @@ class Uri
      * Tries to convert a URL with an internationalized host
      * name to the machine-readable Punycode representation
      *
-     * @return self
+     * @return $this
      */
-    public function unIdn(): self
+    public function unIdn()
     {
         if (empty($this->host) === false) {
             $this->setHost(Idn::encode($this->host));
         }
         return $this;
+    }
+
+    /**
+     * Parses the path inside the props and extracts
+     * the params unless disabled
+     *
+     * @param array $props
+     * @return array Modified props array
+     */
+    protected static function parsePath(array $props): array
+    {
+        // extract params, the rest is the path;
+        // only do this if not explicitly disabled (set to `false`)
+        if (isset($props['params']) === false || $props['params'] !== false) {
+            $extract           = Params::extract($props['path']);
+            $props['params'] ??= $extract['params'];
+            $props['path']     = $extract['path'];
+            $props['slash']  ??= $extract['slash'];
+
+            return $props;
+        }
+
+        // use the full path;
+        // automatically detect the trailing slash from it if possible
+        if (is_string($props['path']) === true) {
+            $props['slash'] = substr($props['path'], -1, 1) === '/';
+        }
+
+        return $props;
     }
 }

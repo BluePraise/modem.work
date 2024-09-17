@@ -17,20 +17,17 @@ return [
     'computed' => [
         'text' => function () {
             if ($this->text) {
-                $text = $this->model()->toString($this->text);
+                $text = $this->model()->toSafeString($this->text);
                 $text = $this->kirby()->kirbytext($text);
-
                 return $text;
             }
         },
     ],
     'toArray' => function () {
         return [
-            'options' => [
-                'headline' => $this->headline,
-                'text'     => $this->text,
-                'theme'    => $this->theme
-            ]
+            'headline' => $this->headline,
+            'text'     => $this->text,
+            'theme'    => $this->theme
         ];
     }
 ];

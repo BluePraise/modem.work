@@ -1,0 +1,13 @@
+.about-layout {
+  display: -ms-grid;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  grid-gap: 20px;
+  padding: 20px;
+}
+
+.about-title {
+  text-align: left;
+  margin-bottom: 0;
+  line-height: 1;
+}

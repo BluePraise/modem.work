@@ -1,0 +1,24 @@
+title: Modem
+
+columns:
+  - width: 1/2
+    sections:
+      albums: sections/projects
+  - width: 1/2
+    sections:
+      pages:
+        type: pages
+        create: default
+        template:
+          - about
+          - photos
+          - projects
+          - home
+          - default
+      meta:
+        type: fields
+        fields:
+          coords:
+            label: Coordinates
+            type: text
+

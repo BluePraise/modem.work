@@ -1,41 +1,67 @@
+<?php
+
+use Kirby\Cms\Url;
+
+/**
+ * @var \Kirby\Cms\App $kirby
+ * @var string $icons
+ * @var array<string, mixed> $assets
+ * @var array<string, mixed> $fiber
+ * @var string $panelUrl
+ * @var string $nonce
+ */ ?>
 <!DOCTYPE html>
 <html>
 <head>
 
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <meta name="referrer" content="same-origin">
 
   <title>Kirby Panel</title>
 
-  <link rel="stylesheet" href="<?= $assetUrl ?>/css/app.css">
-  <link rel="stylesheet" href="<?= $pluginCss ?>">
+  <script nonce="<?= $nonce ?>">
+    if (
+        !window.CSS ||
+        window.CSS.supports("display", "grid") === false ||
+        !window.fetch
+    ) {
+      window.location.href = "<?= $panelUrl ?>browser";
+    }
+  </script>
 
-  <?php if (isset($config['css'])) : ?>
-    <link rel="stylesheet" href="<?= Url::to($config['css']) ?>">
-  <?php endif ?>
+  <?php foreach ($assets['css'] as $css): ?>
+  <link nonce="<?= $nonce ?>" rel="stylesheet" href="<?= $css ?>">
+  <?php endforeach ?>
 
-  <link rel="apple-touch-icon" href="<?= $assetUrl ?>/apple-touch-icon.png" />
-  <link rel="shortcut icon" href="<?= $assetUrl ?>/favicon.png">
+  <?php foreach ($assets['icons'] as $rel => $icon): ?>
+  <link nonce="<?= $nonce ?>" rel="<?= $rel ?>" href="<?= Url::to($icon['url']) ?>" type="<?= $icon['type'] ?>">
+  <?php endforeach ?>
 
   <base href="<?= $panelUrl ?>">
 </head>
 <body>
-  <?= $icons ?>
   <div id="app"></div>
 
   <noscript>
     Please enable JavaScript in your browser
   </noscript>
 
-  <script>window.panel = <?= json_encode($options, JSON_UNESCAPED_SLASHES) ?></script>
+  <?= $icons ?>
 
-  <script src="<?= $assetUrl ?>/js/plugins.js" defer></script>
-  <script src="<?= $assetUrl ?>/js/vendor.js" defer></script>
-  <script src="<?= $pluginJs ?>" defer></script>
-  <?php if (isset($config['js'])) : ?>
-    <script src="<?= Url::to($config['js']) ?>" defer></script>
-  <?php endif ?>
-  <script src="<?= $assetUrl ?>/js/app.js" defer></script>
+  <script nonce="<?= $nonce ?>">
+    // Panel state
+    const json = <?= json_encode($fiber) ?>;
+
+    window.panel = JSON.parse(JSON.stringify(json));
+
+    // Fiber setup
+    window.fiber = json;
+  </script>
+
+  <?php foreach ($assets['js'] as $js): ?>
+  <?= Html::tag('script', '', $js) . PHP_EOL ?>
+  <?php endforeach ?>
 
 </body>
 </html>

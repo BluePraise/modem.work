@@ -1,5 +1,9 @@
 <?php
 
+use Kirby\Toolkit\A;
+use Kirby\Toolkit\Str;
+use Kirby\Toolkit\V;
+
 return [
     'mixins' => ['min', 'options'],
     'props' => [
@@ -12,7 +16,7 @@ return [
         'placeholder' => null,
 
         /**
-         * If set to <code>all</code>, any type of input is accepted. If set to <code>options</code> only the predefined options are accepted as input.
+         * If set to `all`, any type of input is accepted. If set to `options` only the predefined options are accepted as input.
          */
         'accept' => function ($value = 'all') {
             return V::in($value, ['all', 'options']) ? $value : 'all';
@@ -22,6 +26,13 @@ return [
          */
         'icon' => function ($icon = 'tag') {
             return $icon;
+        },
+        /**
+         * Set to `list` to display each tag with 100% width,
+         * otherwise the tags are displayed inline
+         */
+        'layout' => function (?string $layout = null) {
+            return $layout;
         },
         /**
          * Minimum number of required entries/tags
@@ -43,9 +54,6 @@ return [
         },
     ],
     'computed' => [
-        'options' => function () {
-            return $this->getOptions();
-        },
         'default' => function (): array {
             return $this->toTags($this->default);
         },
@@ -55,6 +63,10 @@ return [
     ],
     'methods' => [
         'toTags' => function ($value) {
+            if (is_null($value) === true) {
+                return [];
+            }
+
             $options = $this->options();
 
             // transform into value-text objects
@@ -75,7 +87,7 @@ return [
                     'value' => $option,
                     'text'  => $option,
                 ];
-            }, Str::split($value));
+            }, Str::split($value, $this->separator()));
         }
     ],
     'save' => function (array $value = null): string {

@@ -1,0 +1,15 @@
+title: Home
+
+icon: 🏠
+
+options:
+  status: false
+
+sections:
+  content:
+    type: fields
+    fields:
+      title:
+        label: Title
+        type: text
+

@@ -53,23 +53,24 @@
         </div>
 
         <div class="showcase-images">
-            <?php if (
+            
+            <?php 
+            if (
               $image = $page
                 ->images()
                 ->sortBy('sort', 'asc')
                 ->first()
             ): ?>
             <div class="showcase-images__col">
-                <img src="<?php echo $image->url(); ?>" alt="<?php echo $image->title(); ?>">
+                <img src="<?php echo $image->resize(1416)->url(); ?>" alt="<?php echo $image->title(); ?>">
             </div>
             <?php endif; ?>
 
             <div class="showcase-images__col">
-            <?php if ($images = $page->images()->sortBy('sort', 'asc')):
-              foreach ($images->slice(1) as $image): ?>
-                <img class="showcase-images__img" src="<?php echo $image->url(); ?>" alt="<?php echo $image->title(); ?>">
-            <?php endforeach;
-            endif; ?>
+            <?php if ($images = $page->images()->sortBy('sort', 'asc')): ?>
+            <?php foreach ($images->slice(1) as $image): ?>
+                <img class="showcase-images__img" loading="lazy" src="<?php echo $image->resize(1416)->url(); ?>" alt="<?php echo $image->title(); ?>">
+            <?php endforeach; endif; ?>
             </div>
         </div> <!-- /.showcase-images -->
     </div> <!-- /.showcase-container -->

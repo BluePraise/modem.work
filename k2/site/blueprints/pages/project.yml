@@ -1,0 +1,76 @@
+title: Project
+num: date
+icon: 📖
+
+status:
+  draft:
+    label: Draft
+    text: The project is still in draft mode. It can only be seen by editors with panel access.
+  unlisted:
+    label: In Review
+    text: The project is online and can be visited with the direct URL. The team must still give the final go to publish it.
+  listed:
+    label: Published
+    text: The project is online
+
+columns:
+  - width: 1/3
+    sections:
+      meta:
+        type: fields
+        fields:
+          order:
+            label: Order
+            type: number
+            width: 1/4
+          year:
+            label: Year
+            type: text
+            width: 1/4
+          location:
+            label: Location
+            type: text
+            width: 1/4
+          author:
+            type: users
+          tags:
+            label: Tags
+            type: tags
+            layout: list
+            options: query
+            query: page.siblings.pluck("tags", ",", true)
+
+      images:
+        type: files
+        template: project-image
+        image:
+          cover: true
+          ratio: 16/9
+
+      files:
+        type: files
+        label: Upload Files
+        template: file
+
+  - width: 2/3
+    fields:
+      headline:
+        label: Project Title
+        type: textarea
+        size: small
+      excerptedText:
+        type: textarea
+        size: medium
+        label: Excerpt
+      text:
+        type: textarea
+        size: large
+        label: Full Text
+      # isExcerpt:
+      #   type: toggle
+      #   label: Should be Excerpted?
+      #   default: false
+      # numOfChars:
+      #   type: number
+      #   label: Characters count for excerpt
+      #   min: 0

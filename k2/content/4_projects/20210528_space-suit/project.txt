@@ -1,0 +1,43 @@
+Title: Space Suit
+
+----
+
+Order: 1
+
+----
+
+Year: 2021
+
+----
+
+Location: Venice, IT
+
+----
+
+Author: 
+
+- k@modem.work
+
+----
+
+Tags: Exhibit, Design
+
+----
+
+Headline: Space/Suit
+
+----
+
+Excerptedtext: For the 2021 Venice Biennale, modem presents fragments of spacesuit history within objects that are also environments.  Cross-hatching the language of reliquary and care, they are an apparatus of protection as much as of display.
+
+----
+
+Text: 
+
+For the (link: https://www.labiennale.org/en/architecture/2021/participants text: 2021 Venice Biennale), modem presents fragments of spacesuit history within objects that are also environments.  Cross-hatching the language of reliquary and care, they are an apparatus of protection as much as of display. 
+
+The essential truth of these artifacts is one of pragmatism and not of perfection. Human bodies are profoundly unsuited for Space, and our flexible hands (so unlike pressure-equalizing spheres) create the unique challenge of pressure-glove design. In the long development of spacesuit gloves, ideals of engineering and utopian design principles are discarded almost immediately for an endless chain of measurements, experiments and prototypes—of which those in our exhibit are an essential set of links. What is most sacred here is the careful, adaptive, and practical role that architecture must perform, intimately and effectively, across every scale of our ecology. 
+
+Glove prototypes courtesy of Bill Ayrey 
+
+Exhibit fabrication with Davis Griffith

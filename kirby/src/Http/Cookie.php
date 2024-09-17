@@ -2,6 +2,7 @@
 
 namespace Kirby\Http;
 
+use Kirby\Cms\App;
 use Kirby\Toolkit\Str;
 
 /**
@@ -10,12 +11,12 @@ use Kirby\Toolkit\Str;
  *
  * @package   Kirby Http
  * @author    Bastian Allgeier <bastian@getkirby.com>
- * @link      http://getkirby.com
+ * @link      https://getkirby.com
  * @copyright Bastian Allgeier
+ * @license   https://opensource.org/licenses/MIT
  */
 class Cookie
 {
-
     /**
      * Key to use for cookie signing
      * @var string
@@ -32,21 +33,25 @@ class Cookie
      *
      * </code>
      *
-     * @param  string  $key       The name of the cookie
-     * @param  string  $value     The cookie content
-     * @param  array   $options   Array of options:
-     *                            lifetime, path, domain, secure, httpOnly
-     * @return boolean            true: cookie was created,
-     *                            false: cookie creation failed
+     * @param string $key The name of the cookie
+     * @param string $value The cookie content
+     * @param array $options Array of options:
+     *                       lifetime, path, domain, secure, httpOnly, sameSite
+     * @return bool true: cookie was created,
+     *              false: cookie creation failed
      */
     public static function set(string $key, string $value, array $options = []): bool
     {
+        // modify CMS caching behavior
+        static::trackUsage($key);
+
         // extract options
-        $lifetime = $options['lifetime'] ?? 0;
+        $expires  = static::lifetime($options['lifetime'] ?? 0);
         $path     = $options['path']     ?? '/';
         $domain   = $options['domain']   ?? null;
         $secure   = $options['secure']   ?? false;
-        $httpOnly = $options['httpOnly'] ?? true;
+        $httponly = $options['httpOnly'] ?? true;
+        $samesite = $options['sameSite'] ?? 'Lax';
 
         // add an HMAC signature of the value
         $value = static::hmac($value) . '+' . $value;
@@ -55,13 +60,14 @@ class Cookie
         $_COOKIE[$key] = $value;
 
         // store the cookie
-        return setcookie($key, $value, static::lifetime($lifetime), $path, $domain, $secure, $httpOnly);
+        $options = compact('expires', 'path', 'domain', 'secure', 'httponly', 'samesite');
+        return setcookie($key, $value, $options);
     }
 
     /**
      * Calculates the lifetime for a cookie
      *
-     * @param  int $minutes Number of minutes or timestamp
+     * @param int $minutes Number of minutes or timestamp
      * @return int
      */
     public static function lifetime(int $minutes): int
@@ -87,16 +93,17 @@ class Cookie
      *
      * </code>
      *
-     * @param  string  $key       The name of the cookie
-     * @param  string  $value     The cookie content
-     * @param  array   $options   Array of options:
-     *                            path, domain, secure, httpOnly
-     * @return boolean            true: cookie was created,
-     *                            false: cookie creation failed
+     * @param string $key The name of the cookie
+     * @param string $value The cookie content
+     * @param array $options Array of options:
+     *                       path, domain, secure, httpOnly
+     * @return bool true: cookie was created,
+     *              false: cookie creation failed
      */
     public static function forever(string $key, string $value, array $options = []): bool
     {
-        $options['lifetime'] = 253402214400; // 9999-12-31
+        // 9999-12-31 if supported (lower on 32-bit servers)
+        $options['lifetime'] = min(253402214400, PHP_INT_MAX);
         return static::set($key, $value, $options);
     }
 
@@ -110,16 +117,20 @@ class Cookie
      *
      * </code>
      *
-     * @param  string|null  $key     The name of the cookie
-     * @param  string|null  $default The default value, which should be returned
-     *                               if the cookie has not been found
-     * @return mixed                 The found value
+     * @param string|null $key The name of the cookie
+     * @param string|null $default The default value, which should be returned
+     *                             if the cookie has not been found
+     * @return mixed The found value
      */
     public static function get(string $key = null, string $default = null)
     {
         if ($key === null) {
             return $_COOKIE;
         }
+
+        // modify CMS caching behavior
+        static::trackUsage($key);
+
         $value = $_COOKIE[$key] ?? null;
         return empty($value) ? $default : static::parse($value);
     }
@@ -127,8 +138,8 @@ class Cookie
     /**
      * Checks if a cookie exists
      *
-     * @param  string  $key
-     * @return boolean
+     * @param string $key
+     * @return bool
      */
     public static function exists(string $key): bool
     {
@@ -139,7 +150,7 @@ class Cookie
      * Creates a HMAC for the cookie value
      * Used as a cookie signature to prevent easy tampering with cookie data
      *
-     * @param  string $value
+     * @param string $value
      * @return string
      */
     protected static function hmac(string $value): string
@@ -151,7 +162,7 @@ class Cookie
      * Parses the hashed value from a cookie
      * and tries to extract the value
      *
-     * @param  string $string
+     * @param string $string
      * @return mixed
      */
     protected static function parse(string $string)
@@ -190,9 +201,9 @@ class Cookie
      *
      * </code>
      *
-     * @param  string  $key The name of the cookie
-     * @return boolean      true: the cookie has been removed,
-     *                      false: the cookie could not be removed
+     * @param string $key The name of the cookie
+     * @return bool true: the cookie has been removed,
+     *              false: the cookie could not be removed
      */
     public static function remove(string $key): bool
     {
@@ -202,5 +213,25 @@ class Cookie
         }
 
         return false;
+    }
+
+    /**
+     * Tells the CMS responder that the response relies on a cookie and
+     * its value (even if the cookie isn't set in the current request);
+     * this ensures that the response is only cached for visitors who don't
+     * have this cookie set;
+     * https://github.com/getkirby/kirby/issues/4423#issuecomment-1166300526
+     *
+     * @param string $key
+     * @return void
+     */
+    protected static function trackUsage(string $key): void
+    {
+        // lazily request the instance for non-CMS use cases
+        $kirby = App::instance(null, true);
+
+        if ($kirby) {
+            $kirby->response()->usesCookie($key);
+        }
     }
 }

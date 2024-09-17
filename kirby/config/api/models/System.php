@@ -1,51 +1,41 @@
 <?php
 
 use Kirby\Cms\System;
+use Kirby\Toolkit\Str;
 
 /**
  * System
  */
 return [
     'fields' => [
-        'isOk' => function (System $system) {
-            return $system->isOk();
-        },
-        'isInstallable' => function (System $system) {
-            return $system->isInstallable();
-        },
-        'isInstalled' => function (System $system) {
-            return $system->isInstalled();
-        },
-        'isLocal' => function (System $system) {
-            return $system->isLocal();
-        },
-        'multilang' => function () {
-            return $this->kirby()->option('languages', false) !== false;
-        },
-        'languages' => function () {
-            return $this->kirby()->languages();
-        },
-        'license' => function (System $system) {
-            return $system->license();
-        },
-        'requirements' => function (System $system) {
-            return $system->toArray();
-        },
-        'breadcrumbTitle' => function () {
-            try {
-                return $this->site()->blueprint()->title();
-            } catch (Throwable $e) {
-                return $this->site()->title()->value();
+        'ascii'           => fn () => Str::$ascii,
+        'authStatus'      => fn () => $this->kirby()->auth()->status()->toArray(),
+        'defaultLanguage' => fn () => $this->kirby()->panelLanguage(),
+        'isOk'            => fn (System $system) => $system->isOk(),
+        'isInstallable'   => fn (System $system) => $system->isInstallable(),
+        'isInstalled'     => fn (System $system) => $system->isInstalled(),
+        'isLocal'         => fn (System $system) => $system->isLocal(),
+        'multilang'       => fn () => $this->kirby()->option('languages', false) !== false,
+        'languages'       => fn () => $this->kirby()->languages(),
+        'license'         => fn (System $system) => $system->license(),
+        'locales'         => function () {
+            $locales = [];
+            $translations = $this->kirby()->translations();
+            foreach ($translations as $translation) {
+                $locales[$translation->code()] = $translation->locale();
             }
+            return $locales;
         },
-        'title' => function () {
-            return $this->site()->title()->value();
-        },
+        'loginMethods' => fn (System $system) => array_keys($system->loginMethods()),
+        'requirements' => fn (System $system) => $system->toArray(),
+        'site'         => fn (System $system) => $system->title(),
+        'slugs'        => fn () => Str::$language,
+        'title'        => fn () => $this->site()->title()->value(),
         'translation' => function () {
             if ($user = $this->user()) {
                 $translationCode = $user->language();
             } else {
-                $translationCode = $this->kirby()->option('panel.language', 'en');
+                $translationCode = $this->kirby()->panelLanguage();
             }
 
             if ($translation = $this->kirby()->translation($translationCode)) {
@@ -54,22 +44,26 @@ return [
                 return $this->kirby()->translation('en');
             }
         },
-        'kirbytext' => function () {
-            return $this->kirby()->option('panel')['kirbytext'] ?? true;
-        },
-        'user' => function () {
-            return $this->user();
-        },
+        'kirbytext' => fn () => $this->kirby()->option('panel.kirbytext') ?? true,
+        'user' => fn () => $this->user(),
         'version' => function () {
-            return $this->kirby()->version();
+            $user = $this->user();
+
+            if ($user && $user->role()->permissions()->for('access', 'system') === true) {
+                return $this->kirby()->version();
+            } else {
+                return null;
+            }
         }
     ],
-    'type'   => System::class,
+    'type'   => 'Kirby\Cms\System',
     'views'  => [
         'login' => [
+            'authStatus',
             'isOk',
             'isInstallable',
             'isInstalled',
+            'loginMethods',
             'title',
             'translation'
         ],
@@ -82,19 +76,23 @@ return [
             'requirements'
         ],
         'panel' => [
-            'breadcrumbTitle',
+            'ascii',
+            'defaultLanguage',
             'isOk',
             'isInstalled',
             'isLocal',
             'kirbytext',
-            'languages' => 'compact',
+            'languages',
             'license',
+            'locales',
             'multilang',
             'requirements',
+            'site',
+            'slugs',
             'title',
             'translation',
             'user' => 'auth',
-                'version'
+            'version'
         ]
     ],
 ];

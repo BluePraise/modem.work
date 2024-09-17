@@ -1,0 +1,9 @@
+Title: image 2
+
+----
+
+Inhero: true
+
+----
+
+Template: project-image

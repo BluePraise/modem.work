@@ -3,9 +3,8 @@
 namespace Kirby\Http;
 
 use Exception;
+use Kirby\Filesystem\F;
 use Throwable;
-
-use Kirby\Toolkit\F;
 
 /**
  * Representation of an Http response,
@@ -14,13 +13,12 @@ use Kirby\Toolkit\F;
  *
  * @package   Kirby Http
  * @author    Bastian Allgeier <bastian@getkirby.com>
- * @link      http://getkirby.com
+ * @link      https://getkirby.com
  * @copyright Bastian Allgeier
- * @license   MIT
+ * @license   https://opensource.org/licenses/MIT
  */
 class Response
 {
-
     /**
      * Store for all registered headers,
      * which will be sent with the response
@@ -60,9 +58,11 @@ class Response
     /**
      * Creates a new response object
      *
-     * @param string  $body
-     * @param string  $type
-     * @param integer $code
+     * @param string $body
+     * @param string $type
+     * @param int $code
+     * @param array $headers
+     * @param string $charset
      */
     public function __construct($body = '', ?string $type = null, ?int $code = null, ?array $headers = null, ?string $charset = null)
     {
@@ -90,11 +90,11 @@ class Response
     }
 
     /**
-     * Improved var_dump() output
+     * Improved `var_dump` output
      *
      * @return array
      */
-    public function __debuginfo(): array
+    public function __debugInfo(): array
     {
         return $this->toArray();
     }
@@ -151,49 +151,76 @@ class Response
      *
      * @param string $file
      * @param string $filename
-     * @return self
+     * @param array $props Custom overrides for response props (e.g. headers)
+     * @return static
      */
-    public static function download(string $file, string $filename = null)
+    public static function download(string $file, string $filename = null, array $props = [])
     {
         if (file_exists($file) === false) {
             throw new Exception('The file could not be found');
         }
 
-        $filename = $filename ?? basename($file);
-        $modified = filemtime($file);
-        $body     = file_get_contents($file);
-        $size     = strlen($body);
+        $filename ??= basename($file);
+        $modified   = filemtime($file);
+        $body       = file_get_contents($file);
+        $size       = strlen($body);
 
-        return new static([
+        $props = array_replace_recursive([
             'body'    => $body,
-            'type'    => 'application/force-download',
+            'type'    => F::mime($file),
             'headers' => [
                 'Pragma'                    => 'public',
-                'Expires'                   => '0',
+                'Cache-Control'             => 'no-cache, no-store, must-revalidate',
                 'Last-Modified'             => gmdate('D, d M Y H:i:s', $modified) . ' GMT',
                 'Content-Disposition'       => 'attachment; filename="' . $filename . '"',
                 'Content-Transfer-Encoding' => 'binary',
                 'Content-Length'            => $size,
                 'Connection'                => 'close'
             ]
-        ]);
+        ], $props);
+
+        return new static($props);
     }
 
     /**
      * Creates a response for a file and
      * sends the file content to the browser
      *
-     * @return self
+     * @param string $file
+     * @param array $props Custom overrides for response props (e.g. headers)
+     * @return static
      */
-    public static function file(string $file)
+    public static function file(string $file, array $props = [])
     {
-        return new static(F::read($file), F::extensionToMime(F::extension($file)));
+        $props = array_merge([
+            'body' => F::read($file),
+            'type' => F::extensionToMime(F::extension($file))
+        ], $props);
+
+        return new static($props);
+    }
+
+
+    /**
+     * Redirects to the given Urls
+     * Urls can be relative or absolute.
+     * @since 3.7.0
+     *
+     * @param string $url
+     * @param int $code
+     * @return void
+     *
+     * @codeCoverageIgnore
+     */
+    public static function go(string $url = '/', int $code = 302)
+    {
+        die(static::redirect($url, $code));
     }
 
     /**
      * Getter for single headers
      *
-     * @param  string      $key   Name of the header
+     * @param string $key Name of the header
      * @return string|null
      */
     public function header(string $key): ?string
@@ -216,15 +243,15 @@ class Response
      * header and automatic conversion of arrays.
      *
      * @param string|array $body
-     * @param integer $code
-     * @param boolean $pretty
+     * @param int $code
+     * @param bool $pretty
      * @param array $headers
-     * @return self
+     * @return static
      */
     public static function json($body = '', ?int $code = null, ?bool $pretty = null, array $headers = [])
     {
         if (is_array($body) === true) {
-            $body = json_encode($body, $pretty === true ? JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES : null);
+            $body = json_encode($body, $pretty === true ? JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES : 0);
         }
 
         return new static([
@@ -241,15 +268,15 @@ class Response
      * given location.
      *
      * @param string $location
-     * @param integer $code
-     * @return self
+     * @param int $code
+     * @return static
      */
-    public static function redirect(?string $location = null, ?int $code = null)
+    public static function redirect(string $location = '/', int $code = 302)
     {
         return new static([
-            'code' => $code ?? 302,
+            'code' => $code,
             'headers' => [
-                'Location' => Url::unIdn($location ?? '/')
+                'Location' => Url::unIdn($location)
             ]
         ]);
     }

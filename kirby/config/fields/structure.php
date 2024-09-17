@@ -1,7 +1,8 @@
 <?php
 
-use Kirby\Cms\Form;
-use Kirby\Cms\Blueprint;
+use Kirby\Data\Data;
+use Kirby\Form\Form;
+use Kirby\Toolkit\I18n;
 
 return [
     'mixins' => ['min'],
@@ -23,6 +24,14 @@ return [
             // be lowercase as well.
             return array_change_key_case($columns);
         },
+
+        /**
+         * Toggles duplicating rows for the structure
+         */
+        'duplicate' => function (bool $duplicate = true) {
+            return $duplicate;
+        },
+
         /**
          * The placeholder text if no items have been added yet
          */
@@ -62,13 +71,19 @@ return [
             return $min;
         },
         /**
+         * Toggles adding to the top or bottom of the list
+         */
+        'prepend' => function (bool $prepend = null) {
+            return $prepend;
+        },
+        /**
          * Toggles drag & drop sorting
          */
         'sortable' => function (bool $sortable = null) {
             return $sortable;
         },
         /**
-         * Sorts the entries by the given field and order (i.e. title desc)
+         * Sorts the entries by the given field and order (i.e. `title desc`)
          * Drag & drop is disabled in this case
          */
         'sortBy' => function (string $sort = null) {
@@ -83,17 +98,22 @@ return [
             return $this->rows($this->value);
         },
         'fields' => function () {
+            if (empty($this->fields) === true) {
+                throw new Exception('Please provide some fields for the structure');
+            }
+
             return $this->form()->fields()->toArray();
         },
         'columns' => function () {
             $columns = [];
+            $mobile  = 0;
 
             if (empty($this->columns)) {
                 foreach ($this->fields as $field) {
 
-                    // Skip hidden fields.
+                    // Skip hidden and unsaveable fields
                     // They should never be included as column
-                    if ($field['type'] === 'hidden') {
+                    if ($field['type'] === 'hidden' || $field['saveable'] === false) {
                         continue;
                     }
 
@@ -110,8 +130,12 @@ return [
 
                     $field = $this->fields[$columnName] ?? null;
 
-                    if (empty($field) === true) {
+                    if (empty($field) === true || $field['saveable'] === false) {
                         continue;
+                    }
+
+                    if (($columnProps['mobile'] ?? false) === true) {
+                        $mobile++;
                     }
 
                     $columns[$columnName] = array_merge($columnProps, [
@@ -121,12 +145,18 @@ return [
                 }
             }
 
+            // make the first column visible on mobile
+            // if no other mobile columns are defined
+            if ($mobile === 0) {
+                $columns[array_key_first($columns)]['mobile'] = true;
+            }
+
             return $columns;
         }
     ],
     'methods' => [
         'rows' => function ($value) {
-            $rows  = Yaml::decode($value);
+            $rows  = Data::decode($value, 'yaml');
             $value = [];
 
             foreach ($rows as $index => $row) {
@@ -162,7 +192,7 @@ return [
         $data = [];
 
         foreach ($value as $row) {
-            $data[] = $this->form($row)->data(true);
+            $data[] = $this->form($row)->content();
         }
 
         return $data;

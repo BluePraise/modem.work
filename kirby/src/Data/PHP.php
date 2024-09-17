@@ -2,28 +2,29 @@
 
 namespace Kirby\Data;
 
-use Exception;
-use Kirby\Toolkit\F;
+use Kirby\Exception\BadMethodCallException;
+use Kirby\Exception\Exception;
+use Kirby\Filesystem\F;
 
 /**
  * Reader and write of PHP files with data in a returned array
  *
  * @package   Kirby Data
  * @author    Bastian Allgeier <bastian@getkirby.com>
- * @link      http://getkirby.com
+ * @link      https://getkirby.com
  * @copyright Bastian Allgeier
- * @license   MIT
+ * @license   https://opensource.org/licenses/MIT
  */
 class PHP extends Handler
 {
     /**
      * Converts an array to PHP file content
      *
-     * @param  mixed  $data
-     * @param  string $indent
+     * @param mixed $data
+     * @param string $indent For internal use only
      * @return string
      */
-    public static function encode($data, $indent = ''): string
+    public static function encode($data, string $indent = ''): string
     {
         switch (gettype($data)) {
             case 'array':
@@ -34,10 +35,10 @@ class PHP extends Handler
                     $array[] = "$indent    " . ($indexed ? '' : static::encode($key) . ' => ') . static::encode($value, "$indent    ");
                 }
 
-                return "[\n" . implode(",\n", $array) . "\n" . $indent . "]";
+                return "[\n" . implode(",\n", $array) . "\n" . $indent . ']';
             case 'boolean':
                 return $data ? 'true' : 'false';
-            case 'int':
+            case 'integer':
             case 'double':
                 return $data;
             default:
@@ -46,42 +47,48 @@ class PHP extends Handler
     }
 
     /**
-     * PHP arrays don't have to be decoded
+     * PHP strings shouldn't be decoded manually
      *
-     * @param  array $array
+     * @param mixed $string
      * @return array
      */
-    public static function decode($array): array
+    public static function decode($string): array
     {
-        return $array;
+        throw new BadMethodCallException('The PHP::decode() method is not implemented');
     }
 
     /**
      * Reads data from a file
      *
-     * @param  string $file
+     * @param string $file
      * @return array
      */
     public static function read(string $file): array
     {
-        if (file_exists($file) !== true) {
+        if (is_file($file) !== true) {
             throw new Exception('The file "' . $file . '" does not exist');
         }
 
-        return (array)(include $file);
+        return (array)F::load($file, []);
     }
 
     /**
      * Creates a PHP file with the given data
      *
-     * @param  array    $data
-     * @return boolean
+     * @param string $file
+     * @param mixed $data
+     * @return bool
      */
-    public static function write(string $file = null, array $data = []): bool
+    public static function write(string $file = null, $data = []): bool
     {
         $php = static::encode($data);
         $php = "<?php\n\nreturn $php;";
 
-        return F::write($file, $php);
+        if (F::write($file, $php) === true) {
+            F::invalidateOpcodeCache($file);
+            return true;
+        }
+
+        return false; // @codeCoverageIgnore
     }
 }

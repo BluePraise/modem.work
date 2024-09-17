@@ -1,15 +1,17 @@
 <?php
 
-use Kirby\Cms\App;
 use Kirby\Cms\Html;
 use Kirby\Cms\Url;
+use Kirby\Toolkit\Str;
 
 /**
  * Default KirbyTags definition
  */
 return [
 
-    /* Date */
+    /**
+     * Date
+     */
     'date' => [
         'attr' => [],
         'html' => function ($tag) {
@@ -17,7 +19,9 @@ return [
         }
     ],
 
-    /* Email */
+    /**
+     * Email
+     */
     'email' => [
         'attr' => [
             'class',
@@ -36,10 +40,13 @@ return [
         }
     ],
 
-    /* File */
+    /**
+     * File
+     */
     'file' => [
         'attr' => [
             'class',
+            'download',
             'rel',
             'target',
             'text',
@@ -58,7 +65,7 @@ return [
 
             return Html::a($file->url(), $tag->text, [
                 'class'    => $tag->class,
-                'download' => true,
+                'download' => $tag->download !== 'false',
                 'rel'      => $tag->rel,
                 'target'   => $tag->target,
                 'title'    => $tag->title,
@@ -66,7 +73,9 @@ return [
         }
     ],
 
-    /* Gist */
+    /**
+     * Gist
+     */
     'gist' => [
         'attr' => [
             'file'
@@ -76,7 +85,9 @@ return [
         }
     ],
 
-    /* Image */
+    /**
+     * Image
+     */
     'image' => [
         'attr' => [
             'alt',
@@ -88,7 +99,6 @@ return [
             'linkclass',
             'rel',
             'target',
-            'text',
             'title',
             'width'
         ],
@@ -107,7 +117,13 @@ return [
                     return $img;
                 }
 
-                return Html::a($tag->link === 'self' ? $tag->src : $tag->link, [$img], [
+                if ($link = $tag->file($tag->link)) {
+                    $link = $link->url();
+                } else {
+                    $link = $tag->link === 'self' ? $tag->src : $tag->link;
+                }
+
+                return Html::a($link, [$img], [
                     'rel'    => $tag->rel,
                     'class'  => $tag->linkclass,
                     'target' => $tag->target
@@ -126,13 +142,22 @@ return [
                 return $link($image);
             }
 
+            // render KirbyText in caption
+            if ($tag->caption) {
+                $options = ['markdown' => ['inline' => true]];
+                $caption = $tag->kirby()->kirbytext($tag->caption, $options);
+                $tag->caption = [$caption];
+            }
+
             return Html::figure([ $link($image) ], $tag->caption, [
                 'class' => $tag->class
             ]);
         }
     ],
 
-    /* Link */
+    /**
+     * Link
+     */
     'link' => [
         'attr' => [
             'class',
@@ -158,7 +183,9 @@ return [
         }
     ],
 
-    /* Tel */
+    /**
+     * Tel
+     */
     'tel' => [
         'attr' => [
             'class',
@@ -175,7 +202,9 @@ return [
         }
     ],
 
-    /* Twitter */
+    /**
+     * Twitter
+     */
     'twitter' => [
         'attr' => [
             'class',
@@ -205,24 +234,89 @@ return [
         }
     ],
 
-    /* Video */
+    /**
+     * Video
+     */
     'video' => [
         'attr' => [
-            'class',
+            'autoplay',
             'caption',
+            'controls',
+            'class',
             'height',
-            'width'
+            'loop',
+            'muted',
+            'poster',
+            'preload',
+            'style',
+            'width',
         ],
         'html' => function ($tag) {
-            $video = Html::video(
-                $tag->value,
-                $tag->kirby()->option('kirbytext.video.options', [])
+            // checks and gets if poster is local file
+            if (
+                empty($tag->poster) === false &&
+                Str::startsWith($tag->poster, 'http://') !== true &&
+                Str::startsWith($tag->poster, 'https://') !== true
+            ) {
+                if ($poster = $tag->file($tag->poster)) {
+                    $tag->poster = $poster->url();
+                }
+            }
+
+            // checks video is local or provider(remote)
+            $isLocalVideo = (
+                Str::startsWith($tag->value, 'http://') !== true &&
+                Str::startsWith($tag->value, 'https://') !== true
+            );
+            $isProviderVideo = (
+                $isLocalVideo === false &&
+                (
+                    Str::contains($tag->value, 'youtu', true) === true ||
+                    Str::contains($tag->value, 'vimeo', true) === true
+                )
             );
 
-            return Html::figure([$video], $tag->caption, [
-                'class'  => $tag->class  ?? $tag->kirby()->option('kirbytext.video.class', 'video'),
-                'height' => $tag->height ?? $tag->kirby()->option('kirbytext.video.height'),
-                'width'  => $tag->width  ?? $tag->kirby()->option('kirbytext.video.width'),
+            // default attributes for local and remote videos
+            $attrs = [
+                'height' => $tag->height,
+                'width'  => $tag->width
+            ];
+
+            // don't use attributes that iframe doesn't support
+            if ($isProviderVideo === false) {
+                // converts tag attributes to supported formats (listed below) to output correct html
+                // booleans: autoplay, controls, loop, muted
+                // strings : poster, preload
+                // for ex  : `autoplay` will not work if `false` is a `string` instead of a `boolean`
+                $attrs['autoplay'] = $autoplay = Str::toType($tag->autoplay, 'bool');
+                $attrs['controls'] = Str::toType($tag->controls ?? true, 'bool');
+                $attrs['loop']     = Str::toType($tag->loop, 'bool');
+                $attrs['muted']    = Str::toType($tag->muted ?? $autoplay, 'bool');
+                $attrs['poster']   = $tag->poster;
+                $attrs['preload']  = $tag->preload;
+            }
+
+            // handles local and remote video file
+            if ($isLocalVideo === true) {
+                // handles local video file
+                if ($tag->file = $tag->file($tag->value)) {
+                    $source = Html::tag('source', '', [
+                        'src'  => $tag->file->url(),
+                        'type' => $tag->file->mime()
+                    ]);
+                    $video = Html::tag('video', [$source], $attrs);
+                }
+            } else {
+                $video = Html::video(
+                    $tag->value,
+                    $tag->kirby()->option('kirbytext.video.options', []),
+                    $attrs
+                );
+            }
+
+            return Html::figure([$video ?? ''], $tag->caption, [
+                'class' => $tag->class ?? 'video',
+                'style' => $tag->style
             ]);
         }
     ],

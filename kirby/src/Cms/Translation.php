@@ -4,10 +4,17 @@ namespace Kirby\Cms;
 
 use Exception;
 use Kirby\Data\Data;
+use Kirby\Toolkit\Str;
 
 /**
  * Wrapper around Kirby's localization files,
- * which are store in `kirby/translations`.
+ * which are stored in `kirby/translations`.
+ *
+ * @package   Kirby Cms
+ * @author    Bastian Allgeier <bastian@getkirby.com>
+ * @link      https://getkirby.com
+ * @copyright Bastian Allgeier
+ * @license   https://getkirby.com/license
  */
 class Translation
 {
@@ -32,11 +39,11 @@ class Translation
     }
 
     /**
-     * Improved var_dump output
+     * Improved `var_dump` output
      *
      * @return array
      */
-    public function __debuginfo(): array
+    public function __debugInfo(): array
     {
         return $this->toArray();
     }
@@ -106,8 +113,8 @@ class Translation
      * string by key
      *
      * @param string $key
-     * @param string $default
-     * @return void
+     * @param string|null $default
+     * @return string|null
      */
     public function get(string $key, string $default = null): ?string
     {
@@ -132,15 +139,32 @@ class Translation
      * @param string $code
      * @param string $root
      * @param array $inject
-     * @return self
+     * @return static
      */
     public static function load(string $code, string $root, array $inject = [])
     {
         try {
-            return new Translation($code, array_merge(Data::read($root), $inject));
+            $data = array_merge(Data::read($root), $inject);
         } catch (Exception $e) {
-            return new Translation($code, []);
+            $data = [];
         }
+
+        return new static($code, $data);
+    }
+
+    /**
+     * Returns the PHP locale of the translation
+     *
+     * @return string
+     */
+    public function locale(): string
+    {
+        $default = $this->code;
+        if (Str::contains($default, '_') !== true) {
+            $default .= '_' . strtoupper($this->code);
+        }
+
+        return $this->get('translation.locale', $default);
     }
 
     /**

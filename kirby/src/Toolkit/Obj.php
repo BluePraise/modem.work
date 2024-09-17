@@ -2,15 +2,21 @@
 
 namespace Kirby\Toolkit;
 
+use Kirby\Exception\InvalidArgumentException;
 use stdClass;
 
 /**
  * Super simple stdClass extension with
  * magic getter methods for all properties
+ *
+ * @package   Kirby Toolkit
+ * @author    Bastian Allgeier <bastian@getkirby.com>
+ * @link      https://getkirby.com
+ * @copyright Bastian Allgeier
+ * @license   https://opensource.org/licenses/MIT
  */
 class Obj extends stdClass
 {
-
     /**
      * Constructor
      *
@@ -36,11 +42,11 @@ class Obj extends stdClass
     }
 
     /**
-     * Improved var_dump() output
+     * Improved `var_dump` output
      *
      * @return array
      */
-    public function __debuginfo(): array
+    public function __debugInfo(): array
     {
         return $this->toArray();
     }
@@ -57,14 +63,31 @@ class Obj extends stdClass
     }
 
     /**
-     * Property Getter
+     * Gets one or multiple properties of the object
      *
-     * @param string $property
-     * @param mixed $fallback
+     * @param string|array $property
+     * @param mixed $fallback If multiple properties are requested:
+     *                        Associative array of fallback values per key
      * @return mixed
      */
-    public function get(string $property, $fallback = null)
+    public function get($property, $fallback = null)
     {
+        if (is_array($property)) {
+            if ($fallback === null) {
+                $fallback = [];
+            }
+
+            if (!is_array($fallback)) {
+                throw new InvalidArgumentException('The fallback value must be an array when getting multiple properties');
+            }
+
+            $result = [];
+            foreach ($property as $key) {
+                $result[$key] = $this->$key ?? $fallback[$key] ?? null;
+            }
+            return $result;
+        }
+
         return $this->$property ?? $fallback;
     }
 
@@ -91,6 +114,7 @@ class Obj extends stdClass
     /**
      * Converts the object to a json string
      *
+     * @param mixed ...$arguments
      * @return string
      */
     public function toJson(...$arguments): string
