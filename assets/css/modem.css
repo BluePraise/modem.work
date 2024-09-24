@@ -1027,8 +1027,7 @@ a[href^="mailto"] {
     position: absolute;
     top: 0;
     left: 0;
-    z-index: 9999;
-    overflow: hidden;
+    z-index: 800;
     -webkit-transform: translate3d(0, 0, 0);
     outline: none;
 }
@@ -1219,7 +1218,7 @@ a[href^="mailto"] {
 
 #cboxContent {
     position: relative;
-    overflow: hidden;
+    /* overflow: hidden; */
 }
 
 #cboxCurrent {
@@ -1227,7 +1226,7 @@ a[href^="mailto"] {
     top: 4px;
     left: 3%;
     color: white;
-      mix-blend-mode: difference;
+    mix-blend-mode: difference;
 }
 
 #cboxPrevious,
@@ -1240,56 +1239,47 @@ a[href^="mailto"] {
     overflow: visible;
     width: auto;
     background: none;
+    background-repeat: no-repeat;
     position: absolute;
-    z-index: 9999;
+    z-index: 900;
+    /* hide the text */
+      text-indent: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+}
+
+#cboxPrevious,
+#cboxNext {
+    top: 50%;
+    margin-top: 8px;
+    background-repeat: no-repeat;
+    background-size: 50px;
+    height: 60px;
+    width: 60px;
+    /* hide the text */
+    text-indent: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    -webkit-filter: invert(1);
+    filter: invert(1);
 }
 
 #cboxPrevious {
-    top: 50%;
-    left: 2.5%;
-    margin-top: 8px;
+    left: -70px;
     background-image: url('./../imgs/colorbox/Left.png');
-    background-repeat: no-repeat;
-    background-size: 50px;
-    height: 60px;
-    width:  60px;
-    /* hide the text */
-    text-indent: 100%;
-    white-space: nowrap;
-    overflow: hidden;
-    /*-webkit-filter: invert(1);
-    filter: invert(1);*/
 }
 
 #cboxNext {
-    top: 50%;
-    right: 4px;
-    margin-top: 8px;
+    right: -70px;
     background-image: url('./../imgs/colorbox/Right.png');
-    background-repeat: no-repeat;
-    background-size: 50px;
-    height: 60px;
-    width:  60px;
-    /* hide the text */
-    text-indent: 100%;
-    white-space: nowrap;
-    overflow: hidden;
-    /*-webkit-filter: invert(1);
-    filter: invert(1);*/
 }
 
 #cboxClose {
     top: 10px;
     right: 23px;
     background-image: url('./../imgs/colorbox/Close.png');
-    background-repeat: no-repeat;
     background-size: 40px;
     height: 40px;
-    /*width:  60px;*/
-    /* hide the text */
-    text-indent: 100%;
-    white-space: nowrap;
-    overflow: hidden;
    /* -webkit-filter: invert(1);
    filter: invert(1);*/
 }
