@@ -1231,8 +1231,7 @@ a[href^="mailto"] {
 
 #cboxPrevious,
 #cboxNext,
-#cboxSlideshow,
-#cboxClose {
+#cboxSlideshow {
     border: 0;
     padding: 0;
     margin: 0;
@@ -1256,10 +1255,6 @@ a[href^="mailto"] {
     background-size: 50px;
     height: 60px;
     width: 60px;
-    /* hide the text */
-    text-indent: 100%;
-    white-space: nowrap;
-    overflow: hidden;
     -webkit-filter: invert(1);
     filter: invert(1);
 }
@@ -1275,11 +1270,21 @@ a[href^="mailto"] {
 }
 
 #cboxClose {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    background: none;
     top: 10px;
     right: 23px;
-    background-image: url('./../imgs/colorbox/Close.png');
-    background-size: 40px;
-    height: 40px;
-   /* -webkit-filter: invert(1);
-   filter: invert(1);*/
+    overflow: hidden;
+    color: #fff;
+    mix-blend-mode: difference;
+}
+
+#cboxClose::before {
+  content: '×';
+  font-size: 60px;
+  display: block;
+  text-align: center;
+  line-height: 40px;
 }
