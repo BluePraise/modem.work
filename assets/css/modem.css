@@ -1222,6 +1222,7 @@ a[href^="mailto"] {
 }
 
 #cboxCurrent {
+    display: none !important;
     position: absolute;
     top: 4px;
     left: 3%;
@@ -1274,8 +1275,8 @@ a[href^="mailto"] {
     width: 40px;
     height: 40px;
     background: none;
-    top: 10px;
-    right: 23px;
+    top: -60px;
+    right: -60px;
     overflow: hidden;
     color: #fff;
     mix-blend-mode: difference;
